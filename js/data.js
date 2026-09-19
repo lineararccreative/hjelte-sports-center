@@ -37,7 +37,7 @@ window.HJELTE = {
     region: "Sepulveda Basin Recreation Area · Council District 6",
     // Apps Script web app URL (see backend/SETUP.md). Empty = use the sample
     // data in this file only.
-    apiUrl: "",
+    apiUrl: "https://script.google.com/macros/s/AKfycbyw8qki9BtdOsAn42zegfiJSm0d9tbmCpKSu9Zdy8ycK_KhqRlo79_GaMUXf_IAlbf-/exec",
     // Public admin center link (admin.html in this repo)
     adminUrl: "admin.html",
     // Labels for permit status shown on group cards and the roster

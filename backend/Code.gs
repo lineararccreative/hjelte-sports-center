@@ -42,7 +42,13 @@ const SCHEMA = {
 };
 const LIST_FIELDS = { badges: 1, days: 1, partners: 1, sports: 1, groupIds: 1 };
 const BOOL_FIELDS = { paidPermit: 1, example: 1, confirmed: 1, verified: 1 };
-const NUM_FIELDS = { day: 1, goal: 1, raised: 1, hours: 1, volunteers: 1, value: 1, attempts: 1, participants: 1 };
+const NUM_FIELDS = { day: 1, goal: 1, raised: 1, hours: 1, volunteers: 1, attempts: 1, participants: 1 };
+// Sheets silently converts "09:00" into a time value and "2026-09-19" into a
+// date, so these columns are read back through explicit formatters and are
+// stored as plain text.
+const TIME_FIELDS = { start: 1, end: 1 };
+const DATE_FIELDS = { date: 1 };
+const TEXT_COLUMNS = { Schedule: ["start", "end"], Events: ["date", "start", "end"], WorkLog: ["date"], Meta: ["value"], Projects: ["targetDate"] };
 
 /* ---------------------------------------------------------------- setup */
 function setup() {
@@ -55,6 +61,12 @@ function setup() {
       sh.setFrozenRows(1);
       sh.getRange(1, 1, 1, SCHEMA[name].length).setFontWeight("bold").setBackground("#E4EFE7");
     }
+    // Keep time and date columns as literal text so Sheets does not coerce
+    // "09:00" into a time value or "2026-09-19" into a date.
+    (TEXT_COLUMNS[name] || []).forEach((col) => {
+      const i = SCHEMA[name].indexOf(col);
+      if (i !== -1) sh.getRange(2, i + 1, Math.max(sh.getMaxRows() - 1, 1), 1).setNumberFormat("@");
+    });
   });
   const first = ss.getSheets()[0];
   if (first.getName() === "Sheet1" && first.getLastRow() === 0) ss.deleteSheet(first);
@@ -76,11 +88,23 @@ function sheet(name) {
   if (!sh) throw new Error("Missing sheet " + name + " — run setup()");
   return sh;
 }
+function pad2(n) { return String(n).length < 2 ? "0" + n : String(n); }
 function fromCell(key, v) {
   if (v === "" || v === null || v === undefined) return LIST_FIELDS[key] ? [] : (BOOL_FIELDS[key] ? false : "");
   if (LIST_FIELDS[key]) return String(v).split("|").filter(Boolean).map((x) => (key === "days" ? Number(x) : x));
   if (BOOL_FIELDS[key]) return v === true || String(v).toUpperCase() === "TRUE";
-  if (v instanceof Date) return key === "date" ? Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd") : v.toISOString();
+  if (TIME_FIELDS[key]) {
+    if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "HH:mm");
+    if (typeof v === "number") { const mins = Math.round(v * 1440); return pad2(Math.floor(mins / 60)) + ":" + pad2(mins % 60); }
+    const m = String(v).trim().match(/^(\d{1,2}):(\d{2})/);
+    return m ? pad2(Number(m[1])) + ":" + m[2] : String(v).trim();
+  }
+  if (DATE_FIELDS[key]) {
+    if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    return String(v).trim();
+  }
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), "yyyy-MM-dd");
+  if (NUM_FIELDS[key]) { const n = Number(v); return Number.isFinite(n) ? n : v; }
   return v;
 }
 function toCell(key, v) {
@@ -122,7 +146,11 @@ function deleteRowBy(name, keyField, value) {
   if (i !== -1) sheet(name).deleteRow(i);
   return i !== -1;
 }
-function meta(key) { const r = rows("Meta").find((m) => m.key === key); return r ? r.value : ""; }
+function meta(key) {
+  const r = rows("Meta").find((m) => m.key === key);
+  const v = r ? String(r.value) : "";
+  return /^#[A-Z]+!?$/.test(v) ? "" : v; // a spreadsheet error cell is not a value
+}
 function setMeta(key, value) { upsertRow("Meta", "key", { key, value }); }
 function touch() { setMeta("lastUpdated", todayISO()); }
 function nowISO() { return new Date().toISOString(); }
@@ -192,7 +220,7 @@ function publicData() {
     .map((w) => { delete w.addedBy; return w; });
   return {
     ok: true,
-    lastUpdated: meta("lastUpdated"),
+    lastUpdated: /^\d{4}-\d{2}-\d{2}$/.test(meta("lastUpdated")) ? meta("lastUpdated") : todayISO(),
     groups,
     schedule: rows("Schedule"),
     specialEvents: rows("Events"),
@@ -547,3 +575,27 @@ function parseDays(s) {
   return String(s || "").toLowerCase().split(/[^a-z]+/).map((w) => map[w.slice(0, 3)]).filter((d) => d !== undefined);
 }
 function escapeHtml(s) { return String(s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
+
+
+/* =====================================================================
+   repairFormats() — run once on a sheet created before the text-format
+   fix. It re-applies plain-text formatting to the time and date columns,
+   rewrites those cells as strings, and clears a corrupt lastUpdated.
+   ===================================================================== */
+function repairFormats() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  Object.keys(TEXT_COLUMNS).forEach(function (name) {
+    const sh = ss.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 2) return;
+    TEXT_COLUMNS[name].forEach(function (col) {
+      const i = SCHEMA[name].indexOf(col);
+      if (i === -1) return;
+      const range = sh.getRange(2, i + 1, sh.getLastRow() - 1, 1);
+      const vals = range.getValues().map(function (r) { return [fromCell(col, r[0])]; });
+      range.setNumberFormat("@");
+      range.setValues(vals);
+    });
+  });
+  setMeta("lastUpdated", todayISO());
+  Logger.log("Formats repaired. lastUpdated = " + todayISO());
+}
