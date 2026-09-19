@@ -37,6 +37,7 @@
         <li><a href="#explore">Explore</a></li>
         <li><a href="#sports">Sports</a></li>
         <li><a href="#schedule">Schedule</a></li>
+        <li><a href="#updates">Updates</a></li>
         <li><a href="#groups">Groups</a></li>
         <li><a href="#facility">Facility</a></li>
         <li><a href="#projects">Projects</a></li>
@@ -45,6 +46,8 @@
       </ul>
       <a href="#schedule" class="btn btn-primary btn-sm nav-cta">View Schedule</a>
     </nav>
+
+    <div class="lang-toggle" role="group" aria-label="Language"><button type="button" data-lang="en" lang="en">EN</button><button type="button" data-lang="es" lang="es">ES</button></div>
 
     <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="siteNav" aria-label="Open menu">
       <span></span><span></span><span></span>
@@ -190,6 +193,32 @@
   </div>
 </section>
 
+<!-- ============================ 4b. UPDATES & SUBSCRIBE ============================ -->
+<section class="section updates" id="updates">
+  <div class="container grid-2 gap-lg align-start">
+    <div>
+      <p class="eyebrow reveal">Updates</p>
+      <h2 class="reveal">Latest Updates</h2>
+      <div class="chip-row reveal" id="updateFilters"></div>
+      <div class="update-list reveal" id="updateList"></div>
+    </div>
+    <aside class="card form-card subscribe-card reveal">
+      <p class="eyebrow">Stay in the Loop</p>
+      <h3>Get updates by sport, or everything</h3>
+      <p class="fine-print">Get updates by sport or for everything happening at Hjelte. One email a day at most, only when there is news.</p>
+      <form id="subscribeForm" novalidate>
+        <label class="sub-email"><span class="sr-only">Your email</span><input type="email" name="email" required placeholder="Your email"></label>
+        <div class="sub-sports" id="subscribeSports"></div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary">Subscribe</button>
+          <p class="form-status" id="subscribeStatus" role="status"></p>
+        </div>
+      </form>
+      <p class="fine-print">Subscriptions are handled by the community hub, not the City. Unsubscribe any time from the email footer.</p>
+    </aside>
+  </div>
+</section>
+
 <!-- ============================ 5. SCHEDULE ============================ -->
 <section class="section schedule" id="schedule">
   <div class="container">
@@ -249,6 +278,8 @@
           <button class="chip is-active" data-value="">All</button><button class="chip" data-value="permitted">Permitted</button><button class="chip" data-value="community">Community</button></div>
         <div class="chip-row" data-filter="when"><span class="chip-label">When</span>
           <button class="chip is-active" data-value="">Any</button><button class="chip" data-value="weekday">Weekday</button><button class="chip" data-value="weekend">Weekend</button></div>
+        <div class="chip-row" data-filter="permit"><span class="chip-label">Permit</span>
+          <button class="chip is-active" data-value="">All</button><button class="chip" data-value="permitted">Permitted</button><button class="chip" data-value="none">No permit on file</button><button class="chip" data-value="unknown">Permit status unknown</button></div>
       </div>
     </div>
 
@@ -268,6 +299,14 @@
       <div class="group-grid" id="communityGrid"></div>
     </div>
     <p class="empty-note" id="groupsEmpty" hidden>No groups match your search. <a href="#add-group">Add yours →</a></p>
+
+    <div class="roster reveal" id="roster">
+      <header class="directory-head">
+        <h3>Full Roster</h3>
+        <p>Every group that participates at Hjelte, with permit status. Permit information is self-reported or confirmed by the hub maintainers; the City's permit records govern.</p>
+      </header>
+      <div class="table-wrap"><table class="roster-table" id="rosterTable"></table></div>
+    </div>
   </div>
 </section>
 
@@ -333,7 +372,7 @@
     <div class="section-head reveal">
       <p class="eyebrow">Facility Map</p>
       <h2>Explore Hjelte Sports Center</h2>
-      <p class="lead">Tap a field, entrance or amenity to learn how it's used and jump to its schedule. Illustrated schematic for orientation — not to scale.</p>
+      <p class="lead">Tap a field, entrance or amenity to learn how it's used and jump to its schedule. Four softball diamonds share one outfield with the cricket ground at its center; drawn to scale from measured spans.</p>
     </div>
     <div class="map-layout reveal">
       <div class="map-canvas" id="mapCanvas">
@@ -341,16 +380,60 @@
           <defs>
             <pattern id="mapStripes" width="30" height="700" patternUnits="userSpaceOnUse" patternTransform="rotate(-5)"><rect width="15" height="700" fill="#2E7049"/><rect x="15" width="15" height="700" fill="#33794F"/></pattern>
           </defs>
-          <rect width="1000" height="700" rx="26" fill="url(#mapStripes)"/>
-          <!-- Burbank Blvd -->
-          <rect x="0" y="0" width="1000" height="56" rx="26" fill="#6E6A61"/>
-          <path d="M40 30 H960" stroke="#F1EEE6" stroke-width="2" stroke-dasharray="20 18" opacity=".55"/>
-          <text x="200" y="35" text-anchor="middle" class="map-road-label">BURBANK BLVD</text>
-          <!-- perimeter path -->
-          <path d="M40 200 V660 Q40 680 60 680 H940 Q960 680 960 660 V200" fill="none" stroke="#D9D2C2" stroke-width="10" opacity=".7"/>
+          <defs>
+            <clipPath id="fieldClip"><rect x="316" y="71" width="568" height="568" rx="10"/></clipPath>
+          </defs>
+          <!-- surroundings: sandy ground, trees, perimeter dirt road -->
+          <rect width="1000" height="700" rx="26" fill="#B9A986"/>
+          <g fill="#2B5D3B" opacity=".92">
+            <circle cx="330" cy="38" r="16"/><circle cx="380" cy="30" r="12"/><circle cx="450" cy="40" r="18"/><circle cx="530" cy="28" r="13"/><circle cx="680" cy="36" r="17"/><circle cx="760" cy="26" r="12"/><circle cx="840" cy="40" r="15"/><circle cx="890" cy="28" r="11"/>
+            <circle cx="940" cy="110" r="14"/><circle cx="965" cy="180" r="18"/><circle cx="945" cy="260" r="12"/><circle cx="968" cy="330" r="16"/><circle cx="950" cy="420" r="13"/><circle cx="970" cy="500" r="17"/><circle cx="948" cy="580" r="12"/>
+            <circle cx="30" cy="60" r="14"/><circle cx="34" cy="140" r="17"/><circle cx="28" cy="240" r="12"/><circle cx="36" cy="330" r="16"/><circle cx="30" cy="430" r="13"/><circle cx="34" cy="520" r="17"/>
+            <circle cx="300" cy="670" r="14"/><circle cx="420" cy="682" r="12"/><circle cx="560" cy="676" r="16"/><circle cx="700" cy="684" r="12"/><circle cx="820" cy="672" r="15"/>
+          </g>
+          <path d="M905 60 V648 Q905 668 885 668 H236 Q212 668 200 690" fill="none" stroke="#D9CBA6" stroke-width="22" stroke-linecap="round"/>
+          <!-- parking lot (west) -->
+          <rect x="60" y="84" width="160" height="532" rx="8" fill="#A99C86"/>
+          <g fill="#F1EEE6" opacity=".9">
+            <rect x="74" y="100" width="28" height="14" rx="3"/><rect x="74" y="122" width="28" height="14" rx="3" fill="#3B5A8C"/><rect x="74" y="144" width="28" height="14" rx="3"/><rect x="74" y="188" width="28" height="14" rx="3" fill="#8C3B3B"/><rect x="74" y="210" width="28" height="14" rx="3"/><rect x="74" y="276" width="28" height="14" rx="3"/><rect x="74" y="298" width="28" height="14" rx="3" fill="#2A2E32"/><rect x="74" y="386" width="28" height="14" rx="3"/><rect x="74" y="408" width="28" height="14" rx="3" fill="#3B5A8C"/><rect x="74" y="474" width="28" height="14" rx="3"/><rect x="74" y="540" width="28" height="14" rx="3"/>
+            <rect x="178" y="110" width="28" height="14" rx="3"/><rect x="178" y="132" width="28" height="14" rx="3" fill="#2A2E32"/><rect x="178" y="220" width="28" height="14" rx="3"/><rect x="178" y="242" width="28" height="14" rx="3" fill="#8C3B3B"/><rect x="178" y="330" width="28" height="14" rx="3"/><rect x="178" y="352" width="28" height="14" rx="3"/><rect x="178" y="440" width="28" height="14" rx="3" fill="#3B5A8C"/><rect x="178" y="506" width="28" height="14" rx="3"/><rect x="178" y="572" width="28" height="14" rx="3"/>
+          </g>
+          <!-- west lawn strip + restroom building -->
+          <rect x="230" y="182" width="70" height="336" rx="8" fill="#3C7A4E" opacity=".85"/>
+          <rect x="256" y="278" width="30" height="42" rx="3" fill="#EDE8DD" stroke="#6B7076" stroke-width="1.5"/>
+          <!-- the shared outfield (≈540 × 540 ft) -->
+          <rect x="316" y="71" width="568" height="568" rx="10" fill="url(#mapStripes)"/>
+          <g clip-path="url(#fieldClip)">
+            <g fill="#C9A672"><circle cx="369" cy="124" r="79"/><circle cx="831" cy="124" r="79"/><circle cx="369" cy="586" r="79"/><circle cx="831" cy="586" r="79"/></g>
+            <g fill="none" stroke="#F1EEE6" stroke-width="1.5" opacity=".85"><rect x="322" y="77" width="63" height="63"/><rect x="815" y="77" width="63" height="63"/><rect x="322" y="560" width="63" height="63"/><rect x="815" y="560" width="63" height="63"/></g>
+            <g fill="#F1EEE6"><rect x="319" y="74" width="7" height="7"/><rect x="874" y="74" width="7" height="7"/><rect x="319" y="619" width="7" height="7"/><rect x="874" y="619" width="7" height="7"/></g>
+          </g>
+          <!-- backstops & lights at the four corners -->
+          <g fill="none" stroke="#3D4248" stroke-width="5" stroke-linecap="round"><path d="M296 110 Q292 68 336 64"/><path d="M904 110 Q908 68 864 64"/><path d="M296 600 Q292 642 336 646"/><path d="M904 600 Q908 642 864 646"/></g>
+          <g fill="#F1EEE6" stroke="#3D4248" stroke-width="1.5"><circle cx="330" cy="100" r="3.5"/><circle cx="870" cy="100" r="3.5"/><circle cx="330" cy="610" r="3.5"/><circle cx="870" cy="610" r="3.5"/><circle cx="600" cy="80" r="3.5"/><circle cx="600" cy="630" r="3.5"/></g>
+          <!-- cricket: 420 ft playing area and 20 × 80 ft pitch -->
+          <circle cx="600" cy="355" r="220" fill="rgba(255,255,255,.05)" stroke="#8FE3E8" stroke-width="3" stroke-dasharray="12 10"/>
+          <rect x="589" y="311" width="22" height="88" rx="2" fill="#D8C48A" stroke="#F1EEE6" stroke-width="1.5"/>
+          <!-- measured spans (Los Angeles Cricket concept plan) -->
+          <g class="map-dims" fill="none" stroke="#F1EEE6" stroke-width="1.5" opacity=".9">
+            <path d="M316 54 H884 M316 48 V60 M884 48 V60"/><path d="M316 656 H884 M316 650 V662 M884 650 V662"/>
+            <path d="M306 71 V639 M300 71 H312 M300 639 H312"/><path d="M894 71 V639 M888 71 H900 M888 639 H900"/>
+            <path d="M600 355 L790 245" stroke="#8FE3E8" stroke-dasharray="4 4"/><path d="M611 380 L660 430" stroke="#D8C48A"/>
+          </g>
+          <g class="map-dim-labels">
+            <rect x="574" y="43" width="52" height="18" rx="5"/><text x="600" y="56">544 ft</text>
+            <rect x="574" y="645" width="52" height="18" rx="5"/><text x="600" y="658">536 ft</text>
+            <rect x="266" y="344" width="52" height="18" rx="5"/><text x="292" y="357">543 ft</text>
+            <rect x="868" y="344" width="52" height="18" rx="5"/><text x="894" y="357">539 ft</text>
+            <rect x="680" y="270" width="64" height="18" rx="5" class="cyan"/><text x="712" y="283">R 210 ft</text>
+            <rect x="656" y="430" width="88" height="18" rx="5" class="gold"/><text x="700" y="443">Pitch 20 × 80 ft</text>
+          </g>
+          <!-- scale bar -->
+          <g class="map-scale"><rect x="60" y="634" width="105" height="5"/><rect x="60" y="634" width="52" height="5" fill="#1C1F22"/><text x="60" y="628">0</text><text x="112" y="628">50</text><text x="165" y="628">100 ft</text></g>
           <g id="mapShapes"></g>
           <g id="mapPins"></g>
         </svg>
+        <p class="map-credit">Drawn to scale from measured home-plate spans (Los Angeles Cricket concept plan; Google Maps estimates, not a survey). Cyan circle = 420 ft cricket playing area.</p>
       </div>
       <aside class="map-card" id="mapCard" aria-live="polite">
         <p class="map-card-hint">Select a location on the map to see details.</p>
@@ -372,6 +455,29 @@
   </div>
 </section>
 
+<!-- ============================ 9b. STEWARDSHIP ============================ -->
+<section class="section stewardship" id="stewardship">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Stewardship</p>
+      <h2>Who Keeps Hjelte Going</h2>
+      <p class="lead">The effort behind the fields: maintenance, cleanups, repairs and materials contributed by the groups who play here. Logged by group admins and verified by the hub.</p>
+    </div>
+    <ul class="stats-row reveal" id="stewardStats"></ul>
+    <div class="steward-grid reveal">
+      <div>
+        <h3 class="sub-head">Recent work</h3>
+        <div class="worklog" id="worklogList"></div>
+      </div>
+      <div>
+        <h3 class="sub-head">By organization</h3>
+        <div class="org-bars" id="orgBars"></div>
+        <a href="admin.html" class="btn btn-outline btn-sm" id="logWorkLink">Log your group's work</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============================ 10. PROJECTS ============================ -->
 <section class="section projects" id="projects">
   <div class="container">
@@ -389,6 +495,8 @@
         <button class="chip" data-value="COMPLETED">Completed</button>
       </div>
     </div>
+    <div class="area-strip reveal" id="areaStrip" aria-label="Upcoming project areas"></div>
+    <div class="chip-row reveal" id="areaFilters"><span class="chip-label">Area</span></div>
     <div class="project-grid reveal" id="projectGrid"></div>
   </div>
 </section>
@@ -455,7 +563,7 @@
     </ul></nav>
     <div class="footer-fine">
       <p>Schedules, listings and project details are community-provided and may change. Official permits, posted park regulations and City of Los Angeles Department of Recreation and Parks requirements govern facility use.</p>
-      <p>© <span id="year"></span> Hjelte Sports Center Community Hub · <a href="#add-group">Add your group</a> · <a href="#connect" data-topic="Schedule update">Report an update</a></p>
+      <p>© <span id="year"></span> Hjelte Sports Center Community Hub · <a href="#add-group">Add your group</a> · <a href="#connect" data-topic="Schedule update">Report an update</a> · <a href="admin.html" id="adminLink">Admin sign-in</a></p>
     </div>
   </div>
 </footer>
@@ -472,6 +580,7 @@
 <button class="to-top" id="toTop" aria-label="Back to top">↑</button>
 
 <script src="js/data.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

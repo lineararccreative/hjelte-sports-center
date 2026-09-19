@@ -12,14 +12,15 @@
   const $ = (s, r = document) => r.querySelector(s);
   const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-  const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-  const DAYS_S = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const I18 = window.I18N || { lang: "en", locale: "en-US", days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], t: (x) => x, apply() {}, init() {} };
+  let DAYS = I18.days, DAYS_S = I18.daysShort;
+  const tr = (obj, key) => (I18.lang === "es" && obj && obj[key + "_es"]) ? obj[key + "_es"] : (obj ? obj[key] : "");
   const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
   const fmtTime = (t) => { let [h, m] = t.split(":").map(Number); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return m ? `${h}:${String(m).padStart(2, "0")} ${ap}` : `${h} ${ap}`; };
   const fmtRange = (a, b) => `${fmtTime(a)} – ${fmtTime(b)}`;
   const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const parseISO = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
-  const fmtDate = (d, opts = { weekday: "long", month: "long", day: "numeric" }) => d.toLocaleDateString("en-US", opts);
+  const fmtDate = (d, opts = { weekday: "long", month: "long", day: "numeric" }) => d.toLocaleDateString(I18.locale, opts);
   const money = (n) => "$" + Number(n).toLocaleString("en-US");
   const sport = (id) => D.sports.find((s) => s.id === id) || D.sports[D.sports.length - 1];
   const group = (id) => D.groups.find((g) => g.id === id) || null;
@@ -38,6 +39,27 @@
     return "";
   };
   const mailto = (subject, body) => `mailto:${D.config.contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body || "")}`;
+
+  /* ---------------- API (Google Apps Script) ---------------- */
+  const API = D.config.apiUrl || "";
+  async function api(action, data, token, extra) {
+    const r = await fetch(API, { method: "POST", body: JSON.stringify(Object.assign({ action, data, token }, extra || {})) });
+    const j = await r.json();
+    if (!j.ok) throw new Error(j.error || "Request failed");
+    return j;
+  }
+  async function loadRemote() {
+    if (!API) return false;
+    try {
+      const r = await fetch(API + "?action=data", { cache: "no-store" });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error);
+      ["groups", "schedule", "specialEvents", "updates", "projects", "worklog"].forEach((k) => { if (Array.isArray(j[k])) D[k] = j[k]; });
+      if (j.lastUpdated) D.config.lastUpdated = j.lastUpdated;
+      document.body.classList.add("live-data");
+      return true;
+    } catch (e) { console.warn("Live data unavailable; showing bundled data.", e); return false; }
+  }
 
   /* ---------------- icons ---------------- */
   const I = {
@@ -246,9 +268,10 @@
       out.innerHTML = upcoming.length ? upcoming.map((e) => `<h3 class="day-heading">${fmtDate(parseISO(e.date))}</h3>` + activityCard({ ...e, special: true })).join("") : `<p class="empty-note">No special events posted yet. <a href="#connect" data-topic="Schedule update">Tell us about one →</a></p>`;
     }
   }
+  let currentRange = "today";
   $$(".tabs .tab").forEach((t) => t.addEventListener("click", () => {
     $$(".tabs .tab").forEach((x) => { x.classList.toggle("is-active", x === t); x.setAttribute("aria-selected", String(x === t)); });
-    renderHappening(t.dataset.range);
+    currentRange = t.dataset.range; renderHappening(currentRange);
   }));
 
   // Weekly master schedule
@@ -344,14 +367,14 @@
     $("#legend").innerHTML = Object.entries(D.categories).map(([k, v]) => `<div class="legend-item"><span class="legend-swatch ${k}"></span><div><b>${esc(v.label)}</b><small>${esc(v.desc)}</small></div></div>`).join("")
       + `<div class="legend-sports">${D.sports.map((s) => `<span><i class="dot" style="background:${s.color}"></i>${esc(s.name)}</span>`).join("")}</div>`;
   }
-  (function lastUpdated() {
+  function renderLastUpdated() {
     const el = $("#lastUpdated");
     const d = D.config.lastUpdated ? parseISO(D.config.lastUpdated) : new Date(document.lastModified);
     el.dateTime = isoDate(d); el.textContent = fmtDate(d, { month: "long", day: "numeric", year: "numeric" });
-  })();
+  }
 
   /* ---------------- directory ---------------- */
-  const dir = { q: "", sport: "", ages: "", level: "", category: "", when: "" };
+  const dir = { q: "", sport: "", ages: "", level: "", category: "", when: "", permit: "" };
   const sportRow = $('#groupFilters [data-filter="sport"]');
   sportRow.insertAdjacentHTML("beforeend", `<button class="chip is-active" data-value="">All</button>` + D.sports.map((s) => `<button class="chip" data-value="${s.id}"><i class="dot" style="background:${s.color}"></i>${esc(s.name)}</button>`).join(""));
   $("#groupFilters").addEventListener("click", (e) => {
@@ -371,7 +394,7 @@
     const weekend = g.days.some((d) => d === 0 || d === 6), weekday = g.days.some((d) => d >= 1 && d <= 5);
     return (!dir.q || hay.includes(dir.q)) && (!dir.sport || g.sport === dir.sport) && (!dir.ages || g.ages === dir.ages) &&
       (!dir.level || g.level === dir.level) && (!dir.category || g.category === dir.category) &&
-      (!dir.when || (dir.when === "weekend" ? weekend : weekday));
+      (!dir.when || (dir.when === "weekend" ? weekend : weekday)) && (!dir.permit || (g.permitStatus || "unknown") === dir.permit);
   }
   function groupCard(g) {
     const s = sport(g.sport);
@@ -382,8 +405,8 @@
         <div class="logo-tile">${g.logo ? `<img src="${esc(g.logo)}" alt="">` : esc(g.short)}</div>
         <div><div class="group-name">${esc(g.name)}</div><div class="group-sport">${icon(s.icon)} ${esc(s.name)}</div></div>
       </div>
-      <div class="badges">${g.badges.map((b) => `<span class="badge ${badgeClass(b)}">${esc(b)}</span>`).join("")}</div>
-      <p class="group-desc">${esc(g.description)}</p>
+      <div class="badges">${g.badges.map((b) => `<span class="badge ${badgeClass(b)}">${esc(b)}</span>`).join("")}${permitBadge(g)}</div>
+      <p class="group-desc">${esc(tr(g, "description"))}</p>
       <div class="group-meta">
         <div>${icon("tag")}<span><b>${esc(g.programType)}</b></span></div>
         <div>${icon("users")}<span>${esc(g.ages)} · ${esc(g.level)}</span></div>
@@ -395,6 +418,24 @@
         ${g.website ? `<a class="link-icon" href="${esc(g.website)}" target="_blank" rel="noopener">${icon("globe")} Website</a>` : ""}
         ${g.social ? `<a class="link-icon" href="${esc(g.social)}" target="_blank" rel="noopener">${icon("instagram")} ${esc(g.socialHandle || "Social")}</a>` : ""}
       </div></article>`;
+  }
+  function permitBadge(g) {
+    const st = g.permitStatus || "unknown";
+    const label = D.config.permitLabels[st] || st;
+    return `<span class="badge permit permit-${st}">${esc(label)}</span>` + (st === "permitted" && g.paidPermit ? `<span class="badge permit permit-paid">Paid permit</span>` : "");
+  }
+  function renderRoster() {
+    const order = { permitted: 0, unknown: 1, none: 2 };
+    const list = [...D.groups].sort((a, b) => (order[a.permitStatus] ?? 1) - (order[b.permitStatus] ?? 1) || a.name.localeCompare(b.name));
+    $("#rosterTable").innerHTML = `<thead><tr><th>Group</th><th>Sport</th><th>Program</th><th>Permit status</th><th>Paid</th><th>Days</th><th>Contact</th></tr></thead><tbody>` +
+      list.map((g) => { const s = sport(g.sport); const st = g.permitStatus || "unknown"; return `<tr class="${g.example ? "is-sample" : ""}">
+        <td><b>${esc(g.name)}</b>${g.example ? ' <span class="tag tag-example">Sample</span>' : ""}</td>
+        <td><span class="dot" style="background:${s.color}"></span> ${esc(s.name)}</td>
+        <td>${esc(g.programType)}</td>
+        <td><span class="badge permit permit-${st}">${esc(D.config.permitLabels[st] || st)}</span></td>
+        <td>${st === "permitted" ? (g.paidPermit ? "Paid" : "Unpaid") : "—"}</td>
+        <td>${g.days.map((d) => DAYS_S[d]).join(" · ")}</td>
+        <td>${g.email ? `<a href="mailto:${esc(g.email)}">${icon("mail")}</a>` : ""}${g.website ? ` <a href="${esc(g.website)}" target="_blank" rel="noopener">${icon("globe")}</a>` : ""}</td></tr>`; }).join("") + `</tbody>`;
   }
   function renderGroups() {
     const matches = D.groups.filter(groupMatches);
@@ -412,6 +453,14 @@
       if (!form.checkValidity()) { statusEl.textContent = "Please complete the required fields."; statusEl.classList.add("is-error"); const bad = $(":invalid", form); if (bad) bad.focus(); return; }
       statusEl.classList.remove("is-error");
       const fd = new FormData(form);
+      if (API && form.id === "groupForm") {
+        try {
+          statusEl.textContent = I18.t("Sending…");
+          const obj = {}; fd.forEach((v, k) => { if (!(v instanceof File)) obj[k] = v; });
+          await api("submitGroup", obj);
+          statusEl.textContent = I18.t("Your listing was sent for review. It appears once a hub admin approves it."); form.reset(); return;
+        } catch (err) { statusEl.textContent = err.message; statusEl.classList.add("is-error"); return; }
+      }
       if (D.config.formEndpoint) {
         try {
           statusEl.textContent = "Sending…";
@@ -450,36 +499,27 @@
     D.mapLocations.forEach((loc) => {
       const cx = loc.x / 100 * W, cy = loc.y / 100 * H;
       const g = svgEl("g", { class: "hotspot", tabindex: "0", role: "button", "aria-label": loc.name, "data-id": loc.id });
-      if (loc.sport) g.style.setProperty("--sport-fill", sport(loc.sport).color + "AA");
-      if (loc.shape === "diamond") {
+      if (loc.sport) g.style.setProperty("--sport-fill", sport(loc.sport).color + "66");
+      const lx = (loc.lx !== undefined ? loc.lx : loc.x) / 100 * W, ly = (loc.ly !== undefined ? loc.ly : loc.y) / 100 * H;
+      const shortName = loc.name.replace("Softball ", "").replace(" (west lot)", "").replace(" & Picnic Area", "").replace("Los Angeles ", "");
+      if (loc.shape === "circle") {
         const r = loc.r / 100 * W;
-        const field = svgEl("g", { transform: `translate(${cx} ${cy})` });
-        field.appendChild(svgEl("rect", { class: "shape", x: -r, y: -r, width: r * 2, height: r * 2, rx: 6, transform: "rotate(45)" }));
-        field.appendChild(svgEl("rect", { x: -r * .5, y: -r * .5, width: r, height: r, rx: 3, transform: "rotate(45)", fill: "rgba(255,255,255,.35)" }));
-        field.appendChild(svgEl("circle", { r: r * .12, fill: "rgba(255,255,255,.7)" }));
-        g.appendChild(field);
-        const t = svgEl("text", { x: cx, y: cy + 30, "text-anchor": "middle" }); t.textContent = loc.name.replace("Softball ", "").replace("Baseball ", ""); g.appendChild(t);
+        g.appendChild(svgEl("circle", { class: "shape", cx, cy, r }));
+        const t = svgEl("text", { x: lx, y: loc.ly !== undefined ? ly : cy + 4, "text-anchor": "middle" }); t.textContent = shortName; g.appendChild(t);
         shapes.appendChild(g);
-      } else if (loc.shape === "rect" || loc.shape === "pitch") {
+      } else if (loc.shape === "rect") {
         const x = loc.x / 100 * W, y = loc.y / 100 * H, w = loc.w / 100 * W, h = loc.h / 100 * H;
-        if (loc.shape === "pitch") {
-          g.appendChild(svgEl("ellipse", { cx: x + w / 2, cy: y + h / 2, rx: w * 2.4, ry: h * .8, fill: "none", stroke: "rgba(255,255,255,.55)", "stroke-width": 2, "stroke-dasharray": "6 6" }));
-          g.appendChild(svgEl("rect", { class: "shape", x, y, width: w, height: h, rx: 3 }));
-          g.style.setProperty("--sport-fill", "#D8C48A");
-        } else {
-          g.appendChild(svgEl("rect", { class: "shape", x, y, width: w, height: h, rx: 8 }));
-          if (loc.id.startsWith("turf")) { g.appendChild(svgEl("path", { d: `M${x + w / 2} ${y} V${y + h}`, stroke: "rgba(255,255,255,.55)", "stroke-width": 2 })); g.appendChild(svgEl("circle", { cx: x + w / 2, cy: y + h / 2, r: Math.min(w, h) * .18, fill: "none", stroke: "rgba(255,255,255,.55)", "stroke-width": 2 })); }
-          if (loc.id === "parking") for (let i = 1; i < 14; i++) g.appendChild(svgEl("path", { d: `M${x + i * (w / 14)} ${y + 6} V${y + h - 6}`, stroke: "rgba(255,255,255,.4)", "stroke-width": 1.5 }));
-        }
-        const t = svgEl("text", { x: x + w / 2, y: loc.shape === "pitch" ? y - 10 : y + h / 2 + 4, "text-anchor": "middle" }); t.textContent = loc.shape === "pitch" ? "Cricket" : loc.name.replace("Multi-Use ", "").replace("Open Recreation ", ""); g.appendChild(t);
-        shapes.appendChild(g);
+        g.appendChild(svgEl("rect", { class: "shape", x, y, width: w, height: h, rx: 8 }));
+        const t = svgEl("text", { x: loc.lx !== undefined ? lx : x + w / 2, y: loc.ly !== undefined ? ly : y + h / 2 + 4, "text-anchor": "middle" }); t.textContent = shortName; g.appendChild(t);
+        if (loc.id === "outfield") shapes.prepend(g); else shapes.appendChild(g);
       } else {
         const glyph = { Entrance: "M12 4v16M5 12l7 7 7-7", Restrooms: "M9 5a2 2 0 1 0 0 .01M15 5a2 2 0 1 0 0 .01M7 9h4v6l1 5M17 9h-4l-1 6-1 5", Seating: "M4 9h16v3H4zM6 12v7M18 12v7M4 15h16", Path: "M6 20c4-6 8-2 12-8" }[loc.kind] || "M12 8v8M8 12h8";
+        const pinLabel = loc.kind === "Entrance" ? (loc.id === "accessRoad" ? "Access road" : "Field entrance") : loc.name.replace(" & Storage", "").replace(" & Path", "").replace(" & Lights", "");
         const pg = svgEl("g", { transform: `translate(${cx} ${cy})` });
         pg.appendChild(svgEl("circle", { class: "pin-body", r: 15 }));
         pg.appendChild(svgEl("path", { class: "pin-glyph", d: glyph, transform: "translate(-9 -9) scale(.75)", fill: "none", stroke: "#1C1F22", "stroke-width": 2.2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
         g.appendChild(pg);
-        const t = svgEl("text", { x: cx, y: cy + 32, "text-anchor": "middle" }); t.textContent = loc.kind === "Entrance" ? (loc.id === "entranceMain" ? "Main Entrance" : "East Access") : loc.name; g.appendChild(t);
+        const t = svgEl("text", { x: cx, y: cy + 32, "text-anchor": "middle" }); t.textContent = pinLabel; g.appendChild(t);
         pins.appendChild(g);
       }
       g.addEventListener("click", () => selectLocation(loc.id));
@@ -528,23 +568,42 @@
           <div class="featured-lead"><span class="logo-tile" style="--sport:${sport("cricket").color}">LAC</span> Developed by ${esc(f.lead)}</div>
         </div>
         <dl class="fact-grid">
+          ${f.geometry ? `<div class="fact wide"><dt>Ground geometry</dt><dd><ul class="geo">${f.geometry.map(([k, v]) => `<li><span>${esc(k)}</span><b>${esc(v)}</b></li>`).join("")}</ul></dd></div>` : ""}
           <div class="fact"><dt>Funding source</dt><dd>${esc(f.funding)}</dd></div>
           <div class="fact"><dt>Completion status</dt><dd>${esc(f.status)}</dd></div>
           <div class="fact wide"><dt>Community benefit</dt><dd>${esc(f.benefit)}</dd></div>
           <div class="fact wide"><dt>Partners</dt><dd><div class="partner-list">${f.partners.map((p) => `<span>${esc(p)}</span>`).join("")}</div></dd></div>
         </dl>
-      </div>`;
+      </div>
+      ${f.documents ? `<div class="featured-docs"><p class="eyebrow">Plans &amp; guides</p><div class="doc-grid">${f.documents.map((d) => `<a class="doc" href="${esc(d.file)}" target="_blank" rel="noopener"><img src="${esc(d.file)}" alt="${esc(d.label)}" loading="lazy"><span><b>${esc(d.label)}</b><small>${esc(d.caption)}</small></span></a>`).join("")}</div></div>` : ""}`;
     $$("#featuredCard .phase").forEach((ph) => applyImage(ph, ph.dataset.image));
   }
 
   /* ---------------- projects ---------------- */
-  let projStatus = "";
+  let projStatus = "", projArea = "";
+  function renderAreas() {
+    const areas = D.config.projectAreas.map((a) => {
+      const ps = D.projects.filter((p) => p.area === a), active = ps.filter((p) => p.status !== "COMPLETED");
+      const next = active.map((p) => p.targetDate).filter(Boolean).sort()[0];
+      return { a, total: ps.length, active: active.length, next };
+    }).filter((x) => x.total);
+    $("#areaStrip").innerHTML = areas.map((x) => `<button class="area-tile${projArea === x.a ? " is-active" : ""}" data-area="${esc(x.a)}">
+      <b>${esc(x.a)}</b><span>${x.total} ${x.total === 1 ? "project" : "projects"}</span>${x.next ? `<small>Target ${esc(x.next)}</small>` : (x.total - x.active ? `<small>${x.total - x.active} ${I18.t("Completed").toLowerCase()}</small>` : "")}</button>`).join("");
+    $$("#areaStrip .area-tile").forEach((b) => b.addEventListener("click", () => { projArea = projArea === b.dataset.area ? "" : b.dataset.area; syncAreaChips(); renderProjects(); }));
+    const row = $("#areaFilters");
+    row.innerHTML = `<span class="chip-label">Area</span><button class="chip${projArea ? "" : " is-active"}" data-value="">All areas</button>` + areas.map((x) => `<button class="chip${projArea === x.a ? " is-active" : ""}" data-value="${esc(x.a)}">${esc(x.a)}</button>`).join("");
+    $$("#areaFilters .chip").forEach((c) => c.addEventListener("click", () => { projArea = c.dataset.value; syncAreaChips(); renderProjects(); }));
+  }
+  function syncAreaChips() {
+    $$("#areaFilters .chip").forEach((c) => c.classList.toggle("is-active", c.dataset.value === projArea));
+    $$("#areaStrip .area-tile").forEach((b) => b.classList.toggle("is-active", b.dataset.area === projArea));
+  }
   function renderProjects() {
-    const list = D.projects.filter((p) => !projStatus || p.status === projStatus);
+    const list = D.projects.filter((p) => (!projStatus || p.status === projStatus) && (!projArea || p.area === projArea));
     $("#projectGrid").innerHTML = list.map((p) => {
       const pct = p.goal ? Math.min(1, (p.raised || 0) / p.goal) : null;
       return `<article class="project-card">
-        <span class="status s-${slug(p.status)}">${esc(p.status)}</span>
+        <div class="status-row"><span class="status s-${slug(p.status)}">${esc(p.status)}</span>${p.area ? `<span class="tag">${esc(p.area)}</span>` : ""}</div>
         <h3>${esc(p.title)}</h3>
         <p>${esc(p.description)}</p>
         <div class="impact">${icon("impact")}<span>${esc(p.impact)}</span></div>
@@ -564,6 +623,55 @@
     $$("#projectFilters .chip").forEach((c) => c.classList.toggle("is-active", c === chip));
     projStatus = chip.dataset.value; renderProjects();
   });
+
+  /* ---------------- updates & subscribe ---------------- */
+  let updFilter = "all";
+  function renderUpdates() {
+    const ups = [...(D.updates || [])].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+    const sportsIn = [...new Set(ups.map((u) => u.sport).filter((x) => x && x !== "all"))];
+    $("#updateFilters").innerHTML = `<button class="chip${updFilter === "all" ? " is-active" : ""}" data-value="all">All</button>` + sportsIn.map((id) => `<button class="chip${updFilter === id ? " is-active" : ""}" data-value="${id}"><i class="dot" style="background:${sport(id).color}"></i>${esc(sport(id).name)}</button>`).join("");
+    $$("#updateFilters .chip").forEach((c) => c.addEventListener("click", () => { updFilter = c.dataset.value; renderUpdates(); }));
+    const list = ups.filter((u) => updFilter === "all" || u.sport === updFilter || u.sport === "all");
+    $("#updateList").innerHTML = list.length ? list.map((u) => { const s = u.sport && u.sport !== "all" ? sport(u.sport) : null; const g = group(u.groupId);
+      return `<article class="update" style="${s ? sportStyle(s.id) : "--sport:var(--ink-3)"}">
+        <div class="update-meta"><time datetime="${esc(u.createdAt)}">${fmtDate(new Date(u.createdAt), { month: "short", day: "numeric" })}</time>${s ? `<span class="tag tag-sport">${esc(s.name)}</span>` : `<span class="tag">All</span>`}<span>${esc(g ? g.name : u.author)}</span></div>
+        <h3>${esc(tr(u, "title"))}</h3><p>${esc(tr(u, "body"))}</p></article>`; }).join("") : `<p class="empty-note">No updates yet.</p>`;
+  }
+  function renderSubscribeSports() {
+    $("#subscribeSports").innerHTML = `<label class="sub-all"><input type="checkbox" name="sports" value="all" checked> <b>All sports</b></label>` +
+      D.sports.map((s) => `<label><input type="checkbox" name="sports" value="${s.id}"> ${esc(s.name)}</label>`).join("");
+    const all = $('#subscribeSports input[value="all"]');
+    $$("#subscribeSports input").forEach((i) => i.addEventListener("change", () => {
+      if (i === all && all.checked) $$("#subscribeSports input").forEach((x) => { if (x !== all) x.checked = false; });
+      else if (i !== all && i.checked) all.checked = false;
+    }));
+  }
+  $("#subscribeForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const f = e.target, st = $("#subscribeStatus"), email = f.email.value.trim();
+    const sports = $$("#subscribeSports input:checked").map((i) => i.value);
+    st.classList.remove("is-error");
+    if (!f.email.checkValidity()) { st.textContent = I18.t("Please complete the required fields."); st.classList.add("is-error"); return; }
+    if (!sports.length) { st.textContent = I18.t("Choose at least one sport or All sports."); st.classList.add("is-error"); return; }
+    if (!API) { window.location.href = mailto(`Subscribe to Hjelte updates: ${sports.join(", ")}`, `Please add ${email} to updates for: ${sports.join(", ")}.`); st.textContent = I18.t("Email updates aren't switched on yet; check back soon."); return; }
+    try { st.textContent = I18.t("Sending…"); const r = await api("subscribe", null, null, { email, sports }); st.textContent = I18.t(r.message || "Check your inbox to confirm your subscription."); f.reset(); renderSubscribeSports(); }
+    catch (err) { st.textContent = err.message; st.classList.add("is-error"); }
+  });
+
+  /* ---------------- stewardship ---------------- */
+  function renderStewardship() {
+    const w = D.worklog || [];
+    const hours = w.reduce((a, x) => a + Number(x.hours || 0), 0), vols = w.reduce((a, x) => a + Number(x.volunteers || 0), 0), value = w.reduce((a, x) => a + Number(x.value || 0), 0);
+    $("#stewardStats").innerHTML = [[hours, "Volunteer hours"], [vols, "Volunteer shifts"], [w.length, "Work days"], [money(value), "Materials & services"]].map(([v, l]) => `<li><strong>${v}</strong><span>${l}</span></li>`).join("");
+    $("#worklogList").innerHTML = w.length ? [...w].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 8).map((x) => `<article class="work">
+      <time>${fmtDate(parseISO(x.date), { month: "short", day: "numeric", year: "numeric" })}</time>
+      <div><b>${esc(x.activity)}</b><span>${esc(x.organization)}${x.area ? ` · ${esc(x.area)}` : ""}${x.example ? ' <span class="tag tag-example">Sample</span>' : ""}</span></div>
+      <div class="work-nums"><span>${Number(x.hours || 0)} hrs</span><span>${Number(x.volunteers || 0)} people</span>${x.value ? `<span>${money(x.value)}</span>` : ""}<span class="tag ${x.verified ? "tag-ok" : ""}">${x.verified ? "Verified" : "Pending"}</span></div></article>`).join("") : `<p class="empty-note">No work logged yet.</p>`;
+    const byOrg = {}; w.forEach((x) => { byOrg[x.organization] = (byOrg[x.organization] || 0) + Number(x.hours || 0); });
+    const rows = Object.entries(byOrg).sort((a, b) => b[1] - a[1]); const max = rows[0] ? rows[0][1] : 1;
+    $("#orgBars").innerHTML = rows.map(([org, h]) => `<div class="org-bar"><span>${esc(org)}</span><i style="--pct:${h / max}"></i><b>${h} hrs</b></div>`).join("");
+    requestAnimationFrame(() => $$("#orgBars i").forEach((b) => b.classList.add("in")));
+  }
 
   /* ---------------- contribute ---------------- */
   function renderContribute() {
@@ -588,9 +696,16 @@
   }
 
   /* ---------------- init ---------------- */
-  renderSports(); renderHappening("today"); renderSchedule(); renderLegend();
-  renderGroups(); renderMap(); renderFeatured(); renderProjects(); renderContribute(); renderConnect();
-  observeReveals();
+  function renderAll() {
+    DAYS = I18.days; DAYS_S = I18.daysShort;
+    renderSports(); renderHappening(currentRange); renderSchedule(); renderLegend(); renderLastUpdated();
+    renderGroups(); renderRoster(); renderFeatured(); renderAreas(); renderProjects(); renderContribute(); renderConnect();
+    renderUpdates(); renderSubscribeSports(); renderStewardship();
+    $$("[data-count]").forEach((el) => { if (el.closest(".in")) countUp(el); });
+  }
+  window.HJELTE_RERENDER = renderAll;
+  renderMap(); renderAll(); observeReveals(); I18.init();
+  loadRemote().then((ok) => { if (ok) { renderAll(); observeReveals(); I18.apply(); } });
   // hero content should be visible immediately
   requestAnimationFrame(() => $$(".hero .reveal").forEach((el) => el.classList.add("in")));
   // deep link support: index.html#sport-cricket opens that sport's panel

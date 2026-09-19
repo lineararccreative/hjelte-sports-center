@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Admin Center — Hjelte Sports Center Community Hub</title>
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%231C1F22'/%3E%3Cpath d='M14 46 32 14l18 32z' fill='%232E7D4F'/%3E%3Ccircle cx='32' cy='38' r='5' fill='%23C9A227'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/admin.css">
+</head>
+<body class="admin-body">
+
+<header class="admin-header">
+  <div class="container admin-header-inner">
+    <a href="index.html" class="brand">
+      <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 64 64" width="32" height="32"><rect width="64" height="64" rx="14" fill="#1C1F22"/><path d="M14 46 32 14l18 32z" fill="#2E7D4F"/><circle cx="32" cy="38" r="5" fill="#C9A227"/></svg></span>
+      <span class="brand-text"><span class="brand-name">Hjelte Sports Center</span><span class="brand-sub">Admin Center</span></span>
+    </a>
+    <div class="admin-user" id="adminUser" hidden>
+      <span class="admin-role" id="adminRole"></span>
+      <span class="admin-email" id="adminEmail"></span>
+      <button class="btn btn-outline btn-sm" id="signOut">Sign out</button>
+    </div>
+    <a href="index.html" class="btn btn-text btn-sm">← Public site</a>
+  </div>
+</header>
+
+<main class="container admin-main">
+
+  <!-- Not configured -->
+  <section class="card admin-card" id="notConfigured" hidden>
+    <h2>Backend not connected yet</h2>
+    <p>The admin center needs the Google Apps Script web app URL in <code>js/data.js → config.apiUrl</code>. Follow <code>backend/SETUP.md</code> (about 15 minutes), then reload this page.</p>
+  </section>
+
+  <!-- Sign in -->
+  <section class="card admin-card login" id="login" hidden>
+    <p class="eyebrow">Admin sign-in</p>
+    <h2>Sign in with your email</h2>
+    <p class="fine-print">Only addresses added by the master admin can sign in. A 6-digit code is emailed to you; no password to remember.</p>
+    <form id="emailForm" class="form-grid">
+      <label class="span-2"><span>Email</span><input type="email" name="email" required autocomplete="email" placeholder="you@example.org"></label>
+      <div class="span-2 form-actions"><button class="btn btn-primary" type="submit">Send code</button><p class="form-status" id="emailStatus" role="status"></p></div>
+    </form>
+    <form id="codeForm" class="form-grid" hidden>
+      <label class="span-2"><span>6-digit code</span><input name="code" inputmode="numeric" pattern="\d{6}" maxlength="6" required autocomplete="one-time-code" placeholder="123456"></label>
+      <div class="span-2 form-actions"><button class="btn btn-primary" type="submit">Sign in</button><button class="btn btn-text" type="button" id="resend">Use a different email</button><p class="form-status" id="codeStatus" role="status"></p></div>
+    </form>
+  </section>
+
+  <!-- App -->
+  <section id="app" hidden>
+    <nav class="admin-tabs" id="adminTabs" aria-label="Admin sections"></nav>
+    <div class="admin-toolbar">
+      <h2 id="panelTitle"></h2>
+      <div class="toolbar-actions" id="panelActions"></div>
+    </div>
+    <div id="panel" class="admin-panel"></div>
+  </section>
+</main>
+
+<!-- Drawer for forms -->
+<div class="drawer" id="drawer" hidden>
+  <div class="drawer-backdrop" data-close></div>
+  <div class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawerTitle">
+    <header class="drawer-head"><h3 id="drawerTitle"></h3><button class="modal-close" data-close aria-label="Close">×</button></header>
+    <form id="drawerForm" class="form-grid" novalidate></form>
+    <footer class="drawer-foot">
+      <button class="btn btn-primary" id="drawerSave">Save</button>
+      <button class="btn btn-text" type="button" data-close>Cancel</button>
+      <p class="form-status" id="drawerStatus" role="status"></p>
+    </footer>
+  </div>
+</div>
+
+<p class="toast" id="toast" role="status" hidden></p>
+
+<script src="js/data.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
