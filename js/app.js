@@ -574,8 +574,10 @@
       const g = svgEl("g", { class: "hotspot", tabindex: "0", role: "button", "aria-label": loc.name, "data-id": loc.id });
       if (loc.sport) g.style.setProperty("--sport-fill", sport(loc.sport).color + "66");
       const lx = (loc.lx !== undefined ? loc.lx : loc.x) / 100 * W, ly = (loc.ly !== undefined ? loc.ly : loc.y) / 100 * H;
-      const shortName = loc.name.replace("Softball ", "").replace(" (west lot)", "").replace(" & Picnic Area", "").replace("Los Angeles ", "");
-      if (loc.shape === "circle") {
+      const shortName = loc.short || loc.name.replace("Softball ", "").replace(" (west lot)", "").replace(" & Picnic Area", "").replace("Los Angeles ", "");
+      if (loc.shape === "none") {
+        // listed in the chips and the detail card, but draws no shape of its own
+      } else if (loc.shape === "circle") {
         const r = loc.r / 100 * W;
         g.appendChild(svgEl("circle", { class: "shape", cx, cy, r }));
         const t = svgEl("text", { x: lx, y: loc.ly !== undefined ? ly : cy + 4, "text-anchor": "middle" }); t.textContent = shortName; g.appendChild(t);
@@ -583,7 +585,7 @@
       } else if (loc.shape === "rect") {
         const x = loc.x / 100 * W, y = loc.y / 100 * H, w = loc.w / 100 * W, h = loc.h / 100 * H;
         g.appendChild(svgEl("rect", { class: "shape", x, y, width: w, height: h, rx: 8 }));
-        const t = svgEl("text", { x: loc.lx !== undefined ? lx : x + w / 2, y: loc.ly !== undefined ? ly : y + h / 2 + 4, "text-anchor": "middle" }); t.textContent = shortName; g.appendChild(t);
+        if (!loc.noLabel) { const t = svgEl("text", { x: loc.lx !== undefined ? lx : x + w / 2, y: loc.ly !== undefined ? ly : y + h / 2 + 4, "text-anchor": "middle" }); t.textContent = shortName; g.appendChild(t); }
         if (loc.id === "outfield") shapes.prepend(g); else shapes.appendChild(g);
       } else {
         const glyph = { Entrance: "M12 4v16M5 12l7 7 7-7", Restrooms: "M9 5a2 2 0 1 0 0 .01M15 5a2 2 0 1 0 0 .01M7 9h4v6l1 5M17 9h-4l-1 6-1 5", Seating: "M4 9h16v3H4zM6 12v7M18 12v7M4 15h16", Path: "M6 20c4-6 8-2 12-8" }[loc.kind] || "M12 8v8M8 12h8";
@@ -600,6 +602,27 @@
     });
     $("#mapChips").innerHTML = D.mapLocations.map((l) => `<button class="chip" data-loc="${l.id}">${l.sport ? `<i class="dot" style="background:${sport(l.sport).color}"></i>` : ""}${esc(l.name)}</button>`).join("");
     $$("#mapChips .chip").forEach((c) => c.addEventListener("click", () => selectLocation(c.dataset.loc)));
+    $$(".map-modes .mode-btn").forEach((b) => b.addEventListener("click", () => setMapMode(b.dataset.mode)));
+  }
+
+  /* Which areas stay open while a given sport has the field. The protected
+     pitch buffer is closed in every mode except cricket, when it is in use. */
+  const MAP_MODES = {
+    open: "All areas are open. The 15 ft buffer around the cricket pitch stays closed at all times so the prepared turf is not damaged.",
+    cricket: "Cricket has the 420 ft circle. All four diamonds stay open, and so do the parts of the soccer/football areas that fall outside the boundary — the shaded portions are not available, and play should never run alongside or across the circle.",
+    diamonds: "The diamonds are in use. The cricket ground and all four soccer/football areas stay open; keep clear of the ground behind each backstop and watch for foul balls."
+  };
+  function setMapMode(mode) {
+    const svg = $("#facilitySvg");
+    if (!svg || !MAP_MODES[mode]) return;
+    Object.keys(MAP_MODES).forEach((m) => svg.classList.toggle("mode-" + m, m === mode));
+    $$(".map-modes .mode-btn").forEach((b) => {
+      const on = b.dataset.mode === mode;
+      b.classList.toggle("is-active", on);
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    const note = $("#mapModeNote");
+    if (note) { note.textContent = MAP_MODES[mode]; I18.apply(); }
   }
   function selectLocation(id) {
     const loc = D.mapLocations.find((l) => l.id === id);

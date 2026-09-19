@@ -599,6 +599,47 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .map-scale rect { fill: #F1EEE6; stroke: #1C1F22; stroke-width: 1; }
 .map-scale text { font-family: var(--body); font-size: 10px; fill: #1C1F22; font-weight: 600; }
 .map-credit { margin: 10px 8px 4px; font-size: .74rem; color: rgba(255,255,255,.6); line-height: 1.4; }
+
+/* ---------- Facility map: zones, "who's playing" modes, legend ---------- */
+.map-modes { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 10px; }
+.map-modes-label { font-size: .74rem; text-transform: uppercase; letter-spacing: .1em; font-weight: 700; color: var(--muted); }
+.map-mode-btns { display: inline-flex; flex-wrap: wrap; gap: 4px; background: var(--paper, #F7F5F0); border: 1px solid var(--line); border-radius: 999px; padding: 4px; }
+.mode-btn { appearance: none; border: 0; background: transparent; font: inherit; font-size: .85rem; font-weight: 600; color: var(--ink-3); padding: 8px 16px; min-height: 44px; border-radius: 999px; cursor: pointer; transition: background .18s, color .18s; }
+.mode-btn:hover { background: rgba(28,31,34,.06); }
+.mode-btn.is-active { background: var(--ink); color: #fff; }
+.mode-btn:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.map-mode-note { margin: 0 0 18px; font-size: .92rem; line-height: 1.55; color: var(--ink-3); max-width: 76ch; }
+
+.soccer-art .soc > rect { fill: rgba(255,255,255,.055); stroke: rgba(255,255,255,.34); stroke-width: 1.4; }
+.soccer-art .soc > path, .soccer-art .soc > circle { fill: none; stroke: rgba(255,255,255,.4); stroke-width: 1.4; }
+.soccer-art { transition: opacity .25s; }
+
+.cricket-ring { fill: rgba(255,255,255,.05); stroke: #8FE3E8; stroke-width: 3; stroke-dasharray: 12 10; transition: fill .25s, stroke-width .25s, opacity .25s; }
+.zone-protect { fill: url(#redHatch); stroke: #E8756A; stroke-width: 2; transition: fill .25s, stroke .25s; }
+.pitch-strip { fill: #D8C48A; stroke: #F1EEE6; stroke-width: 1.5; }
+.zone-conflict { fill: transparent; transition: fill .25s; }
+.diamond-dirt circle { transition: fill .25s; }
+.bleachers rect { fill: #4A5057; stroke: #2A2E32; stroke-width: 1.5; }
+.bleachers .tier { fill: none; stroke: #A8AEB6; stroke-width: 1.3; }
+
+.mode-cricket .cricket-ring { fill: rgba(143,227,232,.15); stroke-width: 4.5; stroke-dasharray: none; }
+.mode-cricket .zone-protect { fill: rgba(143,227,232,.28); stroke: #8FE3E8; }
+.mode-cricket .zone-conflict { fill: url(#warnHatch); }
+.mode-diamonds .cricket-ring { opacity: .5; }
+.mode-diamonds .diamond-dirt circle { fill: #DCB57C; }
+.mode-diamonds .soccer-art { opacity: .75; }
+
+.map-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 18px 0 0; padding: 0; font-size: .84rem; color: var(--ink-3); }
+.map-legend li { display: inline-flex; align-items: center; gap: 8px; }
+.map-legend .sw { width: 16px; height: 16px; border-radius: 4px; flex: none; border: 1px solid rgba(28,31,34,.2); }
+.sw-turf { background: #2F7449; }
+.sw-diamond { background: #C9A672; }
+.sw-soccer { background: #2F7449; box-shadow: inset 0 0 0 1.5px #fff; }
+.sw-cricket { background: rgba(143,227,232,.3); border-color: #1B7E88; }
+.sw-protect { background: repeating-linear-gradient(45deg, #C0392B 0 4px, #8E2C2C 4px 9px); }
+.sw-conflict { background: repeating-linear-gradient(-45deg, #C0392B 0 4px, rgba(122,46,46,.55) 4px 10px); }
+.sw-bleacher { background: #4A5057; }
+@media (max-width: 599.98px) { .map-mode-btns { width: 100%; } .mode-btn { flex: 1 1 auto; padding: 8px 10px; font-size: .8rem; } }
 .about-map.has-photo .mini-map { display: none; }
 .about-map .photo { display: block; width: 100%; height: auto; aspect-ratio: auto; }
 

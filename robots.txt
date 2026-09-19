@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://lineararccreative.github.io/hjelte-sports-center/sitemap.xml
+Sitemap: https://hjeltesportscenter.com/sitemap.xml
