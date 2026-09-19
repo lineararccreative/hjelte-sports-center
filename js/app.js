@@ -40,6 +40,15 @@
     return !!(g && g.example);
   };
   const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  /* Enum-ish fields (category, permitStatus) come from the Sheet and are used
+     as CSS class tokens. Anyone with edit access to the Sheet could otherwise
+     close the attribute and inject markup, so keep them to a known set. */
+  const token = (v, allowed, fallback) => {
+    const t = String(v == null ? "" : v).trim();
+    return allowed.indexOf(t) !== -1 ? t : fallback;
+  };
+  const catClass = (v) => token(v, Object.keys(D.categories), "open");
+  const permitClass = (v) => token(v, ["permitted", "none", "unknown"], "unknown");
   const sportStyle = (id) => { const s = sport(id); return `--sport:${s.color};--sport-tint:${s.color}22`; };
   const badgeClass = (b) => {
     const k = b.toUpperCase();
@@ -270,7 +279,7 @@
         <div class="activity-meta">
           <span class="tag tag-sport">${esc(s.name)}</span>
           <span class="tag">${esc(e.type)}</span>
-          ${(D.categories[e.category]?.label || e.category) === e.type ? "" : `<span class="tag tag-cat ${e.category}">${esc(D.categories[e.category]?.label || e.category)}</span>`}
+          ${(D.categories[e.category]?.label || e.category) === e.type ? "" : `<span class="tag tag-cat ${catClass(e.category)}">${esc(D.categories[e.category]?.label || e.category)}</span>`}
         </div>
         <div class="activity-meta">
           ${g && e.title ? `<span>${icon("users")}${esc(g.name)}</span>` : ""}
@@ -386,7 +395,7 @@
         const eMin = Math.max(sMin + 15, Math.min(END, toMin(e.end) || END));
         const top = (sMin - START) / 60 * HOUR_H, h = Math.max(18, (eMin - sMin) / 60 * HOUR_H);
         const w = 100 / n, f = facility(e.facility);
-        return `<button class="wg-event ${e.category}" style="${sportStyle(e.sport)};top:${top + 1}px;height:${h - 3}px;left:calc(${lane * w}% + 3px);width:calc(${w}% - 6px)" data-idx="${D.schedule.indexOf(e)}" title="${esc(titleOf(e))} · ${fmtRange(e.start, e.end)}">
+        return `<button class="wg-event ${catClass(e.category)}" style="${sportStyle(e.sport)};top:${top + 1}px;height:${h - 3}px;left:calc(${lane * w}% + 3px);width:calc(${w}% - 6px)" data-idx="${D.schedule.indexOf(e)}" title="${esc(titleOf(e))} · ${fmtRange(e.start, e.end)}">
           <b>${esc(titleOf(e))}</b><span>${fmtRange(e.start, e.end)}</span><span>${esc(f ? f.name : "")}</span></button>`;
       }).join("") + `</div>`;
     }).join("");
@@ -406,7 +415,7 @@
     openModal(`<div style="${sportStyle(e.sport)}">
       <p class="eyebrow">${DAYS[e.day]} · ${fmtRange(e.start, e.end)}</p>
       <h3 id="modalTitle">${esc(titleOf(e))}</h3>
-      <div class="activity-meta" style="margin-bottom:14px"><span class="tag tag-sport">${esc(s.name)}</span><span class="tag">${esc(e.type)}</span><span class="tag tag-cat ${e.category}">${esc(D.categories[e.category]?.label || "")}</span></div>
+      <div class="activity-meta" style="margin-bottom:14px"><span class="tag tag-sport">${esc(s.name)}</span><span class="tag">${esc(e.type)}</span><span class="tag tag-cat ${catClass(e.category)}">${esc(D.categories[e.category]?.label || "")}</span></div>
       <dl class="map-card-dl" style="display:grid;gap:10px;margin:0 0 8px">
         <div><dt class="fine-print" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Facility</dt><dd style="margin:0">${esc(f ? f.name : e.facility)}</dd></div>
         ${g ? `<div><dt class="fine-print" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Organization</dt><dd style="margin:0">${esc(g.name)}${g.example ? " <span class='tag tag-example'>Sample</span>" : ""}<br><small style="color:var(--muted)">${esc(g.programType)} · ${esc(g.ages)}</small></dd></div>` : ""}
@@ -460,7 +469,7 @@
     return `<article class="group-card" style="${sportStyle(g.sport)}" data-id="${g.id}">
       ${g.example ? '<span class="tag tag-example sample-tag" title="Placeholder listing to be replaced with a real group">Sample</span>' : ""}
       <div class="group-top">
-        <div class="logo-tile">${g.logo ? `<img src="${esc(g.logo)}" alt="">` : esc(g.short)}</div>
+        <div class="logo-tile">${safeUrl(g.logoUrl || g.logo) ? `<img src="${esc(safeUrl(g.logoUrl || g.logo))}" alt="" loading="lazy">` : esc(g.short)}</div>
         <div><h3 class="group-name">${esc(g.name)}</h3><div class="group-sport">${icon(s.icon)} ${esc(s.name)}</div></div>
       </div>
       <div class="badges">${g.badges.map((b) => `<span class="badge ${badgeClass(b)}">${esc(b)}</span>`).join("")}${permitBadge(g)}</div>
@@ -480,7 +489,7 @@
   function permitBadge(g) {
     const st = g.permitStatus || "unknown";
     const label = D.config.permitLabels[st] || st;
-    return `<span class="badge permit permit-${st}">${esc(label)}</span>` + (st === "permitted" && g.paidPermit ? `<span class="badge permit permit-paid">Paid permit</span>` : "");
+    return `<span class="badge permit permit-${permitClass(st)}">${esc(label)}</span>` + (st === "permitted" && g.paidPermit ? `<span class="badge permit permit-paid">Paid permit</span>` : "");
   }
   function renderRoster() {
     const order = { permitted: 0, unknown: 1, none: 2 };
@@ -490,7 +499,7 @@
         <th scope="row"><b>${esc(g.name)}</b>${g.example ? ' <span class="tag tag-example">Sample</span>' : ""}</th>
         <td><span class="dot" style="background:${s.color}"></span> ${esc(s.name)}</td>
         <td>${esc(g.programType)}</td>
-        <td><span class="badge permit permit-${st}">${esc(D.config.permitLabels[st] || st)}</span></td>
+        <td><span class="badge permit permit-${permitClass(st)}">${esc(D.config.permitLabels[st] || st)}</span></td>
         <td>${st === "permitted" ? (g.paidPermit ? "Paid" : "Unpaid") : "—"}</td>
         <td>${g.days.map((d) => DAYS_S[d]).join(" · ")}</td>
         <td>${safeMail(g.email) ? `<a href="mailto:${esc(safeMail(g.email))}" aria-label="Email ${esc(g.name)}">${icon("mail")}</a>` : ""}${safeUrl(g.website) ? ` <a href="${esc(safeUrl(g.website))}" target="_blank" rel="noopener" aria-label="${esc(g.name)} website">${icon("globe")}</a>` : ""}</td></tr>`; }).join("") + `</tbody>`;
@@ -568,6 +577,7 @@
   function svgEl(tag, attrs) { const n = document.createElementNS(svgNS, tag); Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, v)); return n; }
   function renderMap() {
     const shapes = $("#mapShapes"), pins = $("#mapPins");
+    shapes.innerHTML = pins.innerHTML = "";
     D.mapLocations.forEach((loc) => {
       const cx = loc.x / 100 * W, cy = loc.y / 100 * H;
       const g = svgEl("g", { class: "hotspot", tabindex: "0", role: "button", "aria-label": loc.name, "data-id": loc.id });
@@ -578,11 +588,11 @@
       // badge stands alone (the soccer areas), otherwise it sits above the label.
       const addLabel = (gx, gy) => {
         if (loc.emoji) {
-          const e = svgEl("text", { class: "map-emoji", x: gx, y: shortName ? gy - 12 : gy + 9, "text-anchor": "middle" });
+          const e = svgEl("text", { class: "map-emoji", "aria-hidden": "true", x: gx, y: shortName ? gy - 12 : gy + 9, "text-anchor": "middle" });
           e.textContent = loc.emoji; g.appendChild(e);
         }
         if (!shortName) return;
-        const t = svgEl("text", { x: gx, y: loc.emoji ? gy + 18 : gy, "text-anchor": "middle" });
+        const t = svgEl("text", { "aria-hidden": "true", x: gx, y: loc.emoji ? gy + 18 : gy, "text-anchor": "middle" });
         t.textContent = shortName; g.appendChild(t);
       };
       if (loc.shape === "none") {
@@ -604,7 +614,7 @@
         pg.appendChild(svgEl("circle", { class: "pin-body", r: 15 }));
         pg.appendChild(svgEl("path", { class: "pin-glyph", d: glyph, transform: "translate(-9 -9) scale(.75)", fill: "none", stroke: "#1C1F22", "stroke-width": 2.2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
         g.appendChild(pg);
-        const t = svgEl("text", { x: cx, y: cy + 32, "text-anchor": "middle" }); t.textContent = pinLabel; g.appendChild(t);
+        const t = svgEl("text", { "aria-hidden": "true", x: cx, y: cy + 32, "text-anchor": "middle" }); t.textContent = pinLabel; g.appendChild(t);
         pins.appendChild(g);
       }
       g.addEventListener("click", () => selectLocation(loc.id));
@@ -702,7 +712,6 @@
   function renderProjects() {
     const list = D.projects.filter((p) => (!projStatus || p.status === projStatus) && (!projArea || p.area === projArea));
     $("#projectGrid").innerHTML = list.map((p) => {
-      const pct = p.goal ? Math.min(1, (p.raised || 0) / p.goal) : null;
       return `<article class="project-card">
         <div class="status-row"><span class="status s-${slug(p.status)}">${esc(p.status)}</span>${p.area ? `<span class="tag">${esc(p.area)}</span>` : ""}</div>
         <h3>${esc(p.title)}</h3>
@@ -713,7 +722,7 @@
           ${p.partners.length ? `<div><b>Partners:</b> ${p.partners.map(esc).join(", ")}</div>` : ""}
           <div><b>Volunteer:</b> ${esc(p.volunteer)}</div>
         </div>
-        <p class="fund-line"><b>Funding needed:</b> TBD</p>
+        ${p.status === "COMPLETED" ? "" : `<p class="fund-line"><b>Funding needed:</b> TBD</p>`}
         ${p.status === "COMPLETED" ? `<a href="#featured" class="btn btn-outline btn-sm">See the story</a>` : `<a href="#connect" class="btn btn-primary btn-sm" data-topic="Fund a project" data-msg="I'd like to support the project: ${esc(p.title)}.%0A%0AHow I can help (funds, materials, volunteer time, introductions):%0A">Support This Project</a>`}
       </article>`;
     }).join("") || `<p class="empty-note" style="grid-column:1/-1">No projects with this status yet.</p>`;
@@ -794,7 +803,7 @@
     $("#infoList").innerHTML = [
       ["pin", "Address", `<a href="${c.mapsUrl}" target="_blank" rel="noopener">${esc(c.address)}</a>`],
       ["clock", "Facility hours", esc(c.hours)]
-    ].map(([ic, t, v]) => `<div><span class="ic">${icon(ic)}</span><div><dt>${t}</dt><dd>${v}</dd></div></div>`).join("");
+    ].map(([ic, t, v]) => `<div><dt><span class="ic">${icon(ic)}</span>${t}</dt><dd>${v}</dd></div>`).join("");
     $("#mapsLink").href = c.mapsUrl; $("#cityLink").href = c.cityPageUrl;
     $("#year").textContent = new Date().getFullYear();
   }

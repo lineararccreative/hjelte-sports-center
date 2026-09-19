@@ -231,7 +231,7 @@
     restore();
     if (window.HJELTE_RERENDER) window.HJELTE_RERENDER();
     if (lang === "es") { apply(); startObserver(); }
-    document.querySelectorAll(".lang-toggle button").forEach((b) => b.classList.toggle("is-active", b.dataset.lang === lang));
+    document.querySelectorAll(".lang-toggle button").forEach((b) => { const on = b.dataset.lang === lang; b.classList.toggle("is-active", on); b.setAttribute("aria-pressed", on ? "true" : "false"); });
   }
   document.documentElement.lang = lang;
   window.I18N = {
@@ -242,7 +242,7 @@
     get days() { return lang === "es" ? ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"] : ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]; },
     get daysShort() { return lang === "es" ? ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; },
     init() {
-      document.querySelectorAll(".lang-toggle button").forEach((b) => { b.classList.toggle("is-active", b.dataset.lang === lang); b.addEventListener("click", () => set(b.dataset.lang)); });
+      document.querySelectorAll(".lang-toggle button").forEach((b) => { const on = b.dataset.lang === lang; b.classList.toggle("is-active", on); b.setAttribute("aria-pressed", on ? "true" : "false"); b.addEventListener("click", () => set(b.dataset.lang)); });
       if (lang === "es") { apply(); startObserver(); }
     }
   };
