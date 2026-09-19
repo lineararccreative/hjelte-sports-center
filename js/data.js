@@ -98,10 +98,10 @@ window.HJELTE = {
      Facilities (used by schedule filters and the map)
      ------------------------------------------------------------------ */
   facilities: [
-    { id: "sbA", name: "Softball Diamond A (upper left)", sport: "softball" },
-    { id: "sbB", name: "Softball Diamond B (upper right)", sport: "softball" },
-    { id: "sbC", name: "Softball Diamond C (lower left)", sport: "softball" },
-    { id: "sbD", name: "Softball Diamond D (lower right)", sport: "softball" },
+    { id: "sbA", name: "Softball Diamond 1 (upper left)", sport: "softball" },
+    { id: "sbB", name: "Softball Diamond 2 (upper right)", sport: "softball" },
+    { id: "sbC", name: "Softball Diamond 3 (lower left)", sport: "softball" },
+    { id: "sbD", name: "Softball Diamond 4 (lower right)", sport: "softball" },
     { id: "cricket", name: "Los Angeles Cricket Ground (center)", sport: "cricket" },
     { id: "outfield", name: "Shared Outfield", sport: "soccer" },
     { id: "soccerN", name: "Soccer / Football — North", sport: "soccer" },
@@ -158,7 +158,7 @@ window.HJELTE = {
       programType: "Girls fast-pitch, ages 8–14", ages: "Youth", level: "Competitive",
       days: [2, 4, 6], times: "Tue · Thu 4:30 – 6:30 PM · Sat 9:00 AM – 1:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Youth fast-pitch program with weekday practices and Saturday game days on Diamonds A–B."
+      description: "Youth fast-pitch program with weekday practices and Saturday game days on Diamonds 1–2."
     },
     {
       id: "ex-baseball-club", name: "Sepulveda Basin Baseball Club", short: "SB", sport: "baseball", example: true,
@@ -166,7 +166,7 @@ window.HJELTE = {
       programType: "Youth travel baseball, 10U–14U", ages: "Youth", level: "Competitive",
       days: [1, 3, 0], times: "Mon · Wed 5:00 – 7:30 PM · Sun 10:00 AM – 3:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Youth baseball program using Diamond B for weekday practices and Sunday games."
+      description: "Youth baseball program using Diamond 2 for weekday practices and Sunday games."
     },
     {
       id: "ex-youth-soccer", name: "Basin Youth Soccer Academy", short: "BY", sport: "soccer", example: true,
@@ -222,7 +222,7 @@ window.HJELTE = {
       programType: "Adult social kickball", ages: "Adult", level: "Recreational",
       days: [5], times: "Fri 6:00 – 8:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Casual Friday-evening kickball on Diamond D when available."
+      description: "Casual Friday-evening kickball on Diamond 4 when available."
     }
   ],
 
@@ -232,13 +232,15 @@ window.HJELTE = {
      ------------------------------------------------------------------ */
   schedule: [
     // Sunday
-    { day: 0, start: "09:00", end: "13:00", sport: "cricket",  groupId: "lac",                 facility: "cricket", type: "Youth Program",     category: "permitted" },
     { day: 0, start: "10:00", end: "15:00", sport: "baseball", groupId: "ex-baseball-club",    facility: "sbB",     type: "Game",              category: "permitted" },
     { day: 0, start: "10:00", end: "12:30", sport: "disc",     groupId: "ex-ultimate",         facility: "outfield",   type: "Open Recreation",   category: "community" },
     { day: 0, start: "16:00", end: "18:30", sport: "soccer",   groupId: "ex-pickup-soccer",    facility: "outfield",   type: "Open Recreation",   category: "community" },
+    { day: 0, start: "09:00", end: "11:00", sport: "softball", groupId: null,                  facility: "sbC",     type: "League",            category: "permitted",  title: "Adult softball — league play" },
+    { day: 0, start: "11:00", end: "13:00", sport: "community",groupId: null,                  facility: "outfield", type: "Maintenance",       category: "maintenance", title: "Field maintenance" },
+    { day: 0, start: "13:00", end: "18:00", sport: "cricket",  groupId: "lac",                 facility: "cricket", type: "Practice",          category: "permitted" },
     // Monday
     { day: 1, start: "06:00", end: "07:00", sport: "fitness",  groupId: "ex-bootcamp",         facility: "westLawn", type: "Training",         category: "community" },
-    { day: 1, start: "08:00", end: "12:00", sport: "community",groupId: null,                  facility: "sbA",     type: "Maintenance",       category: "maintenance", title: "Infield grooming — Diamonds A–B" },
+    { day: 1, start: "08:00", end: "12:00", sport: "community",groupId: null,                  facility: "sbA",     type: "Maintenance",       category: "maintenance", title: "Infield grooming — Diamonds 1–2" },
     { day: 1, start: "17:00", end: "19:30", sport: "baseball", groupId: "ex-baseball-club",    facility: "sbB",     type: "Practice",          category: "permitted" },
     { day: 1, start: "18:30", end: "22:00", sport: "softball", groupId: "ex-softball-league",  facility: "sbC",     type: "League",            category: "permitted" },
     // Tuesday
@@ -262,22 +264,30 @@ window.HJELTE = {
     { day: 5, start: "18:00", end: "20:00", sport: "other",    groupId: "ex-kickball",         facility: "sbD",     type: "Open Recreation",   category: "community" },
     // Saturday
     { day: 6, start: "08:00", end: "12:00", sport: "soccer",   groupId: "ex-youth-soccer",     facility: "outfield",   type: "Game",              category: "permitted" },
-    { day: 6, start: "09:00", end: "13:00", sport: "cricket",  groupId: "lac",                 facility: "cricket", type: "Youth Program",     category: "permitted" },
     { day: 6, start: "09:00", end: "13:00", sport: "softball", groupId: "ex-youth-softball",   facility: "sbA",     type: "Game",              category: "permitted" },
     { day: 6, start: "13:00", end: "17:00", sport: "community",groupId: null,                  facility: "westLawn",    type: "Open Recreation",   category: "open", title: "Open lawn — general community use" },
-    { day: 6, start: "15:00", end: "18:00", sport: "cricket",  groupId: "ex-weekend-cricket",  facility: "westLawn",    type: "Open Recreation",   category: "community" }
+    { day: 6, start: "15:00", end: "18:00", sport: "cricket",  groupId: "ex-weekend-cricket",  facility: "westLawn",    type: "Open Recreation",   category: "community" },
+    { day: 6, start: "09:00", end: "11:00", sport: "softball", groupId: null,                  facility: "sbC",     type: "League",            category: "permitted",  title: "Adult softball — league play" },
+    { day: 6, start: "11:00", end: "13:00", sport: "community",groupId: null,                  facility: "outfield", type: "Maintenance",       category: "maintenance", title: "Field maintenance" },
+    { day: 6, start: "13:00", end: "18:00", sport: "cricket",  groupId: "lac",                 facility: "cricket", type: "Practice",          category: "permitted" }
   ],
 
   /* ------------------------------------------------------------------
      Dated special events (shown in Today / This Week / Upcoming)
      ------------------------------------------------------------------ */
   specialEvents: [
+    { date: "2026-09-25", start: "15:00", end: "17:00", title: "Los Angeles Cricket — practice", sport: "cricket", groupId: "lac", facility: "cricket", type: "Practice", category: "permitted",
+      note: "Squad practice on the cricket ground. Please stay outside the boundary while play is on." },
+    { date: "2026-09-26", start: "13:00", end: "18:00", title: "Los Angeles Cricket — match", sport: "cricket", groupId: "lac", facility: "cricket", type: "Game", category: "permitted",
+      note: "Rope boundary in place. Spectators welcome along the west side of the ground." },
+    { date: "2026-09-27", start: "13:00", end: "18:00", title: "Los Angeles Cricket — match", sport: "cricket", groupId: "lac", facility: "cricket", type: "Game", category: "permitted",
+      note: "Rope boundary in place. Spectators welcome along the west side of the ground." },
     { date: "2026-09-19", start: "09:00", end: "13:00", title: "Cricket Community Open Day", sport: "cricket", groupId: "lac", facility: "cricket", type: "Special Event", category: "permitted",
       note: "Try cricket for the first time — bats, balls and coaches provided." },
     { date: "2026-09-26", start: "08:00", end: "11:00", title: "Fall Field Cleanup Day", sport: "community", groupId: null, facility: "westLawn", type: "Community Activity", category: "community",
       note: "Gloves and bags provided. Meet at the Burbank Blvd entrance." },
     { date: "2026-10-03", start: "08:00", end: "17:00", title: "Softball Fall Classic", sport: "softball", groupId: "ex-softball-league", facility: "sbA", type: "Tournament", category: "permitted", example: true,
-      note: "Diamonds A–D reserved all day." },
+      note: "Diamonds 1–4 reserved all day." },
     { date: "2026-10-10", start: "09:00", end: "14:00", title: "Youth Multi-Sport Family Day", sport: "youth", groupId: null, facility: "outfield", type: "Special Event", category: "community",
       note: "Rotating stations: soccer, cricket, softball and disc." },
     { date: "2026-10-17", start: "07:00", end: "12:00", title: "Irrigation Upgrade — Shared Outfield (south half)", sport: "community", groupId: null, facility: "outfield", type: "Maintenance", category: "maintenance",
@@ -297,30 +307,30 @@ window.HJELTE = {
     { id: "pitchZone", name: "Protected Pitch Zone", short: "Protected zone", kind: "Protected Area", sport: "cricket", shape: "rect", x: 57.18, y: 42.29, w: 5.22, h: 16.41, noLabel: true, facility: "cricket",
       fieldInfo: "The prepared 20 × 80 ft pitch plus a 15 ft buffer on every side — a 50 × 110 ft protected rectangle at the centre of the ground.", uses: "No activities are scheduled here at any time. It opens only for cricket practice and matches, so the prepared turf stays playable.", accessibility: "Please walk around this rectangle rather than across it." },
 
-    { id: "sbA", name: "Softball Diamond A", short: "Diamond A", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 36.8, y: 17.6, r: 7.8, facility: "sbA",
+    { id: "sbA", name: "Softball Diamond 1", short: "Diamond 1", emoji: "⚾", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 36.8, y: 17.6, r: 7.8, facility: "sbA",
       fieldInfo: "Upper-left diamond. Skinned infield, backstop cage, bleachers and lights behind home plate; the outfield faces the centre of the park.", uses: "Leagues, youth fast-pitch, tournaments.", accessibility: "Closest diamond to the parking lot and the field entrance." },
-    { id: "sbB", name: "Softball Diamond B", short: "Diamond B", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 83.2, y: 17.6, r: 7.8, facility: "sbB",
-      fieldInfo: "Upper-right diamond. Skinned infield, backstop cage, bleachers and lights. 544 ft home-plate span across to Diamond A.", uses: "Leagues, youth baseball practices, tournaments.", accessibility: "Reached along the outside road; longest walk from parking." },
-    { id: "sbC", name: "Softball Diamond C", short: "Diamond C", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 36.8, y: 83.7, r: 7.8, facility: "sbC",
-      fieldInfo: "Lower-left diamond. Skinned infield, backstop cage, bleachers and lights. 543 ft span up to Diamond A.", uses: "Weeknight adult leagues.", accessibility: "Short walk from the south end of the parking lot." },
-    { id: "sbD", name: "Softball Diamond D", short: "Diamond D", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 83.2, y: 83.7, r: 7.8, facility: "sbD",
-      fieldInfo: "Lower-right diamond. Skinned infield, backstop cage, bleachers and lights. 536 ft span across to Diamond C.", uses: "Leagues, youth baseball, kickball, open play when available.", accessibility: "Reached along the outside road." },
+    { id: "sbB", name: "Softball Diamond 2", short: "Diamond 2", emoji: "⚾", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 83.2, y: 17.6, r: 7.8, facility: "sbB",
+      fieldInfo: "Upper-right diamond. Skinned infield, backstop cage, bleachers and lights. 544 ft home-plate span across to Diamond 1.", uses: "Leagues, youth baseball practices, tournaments.", accessibility: "Reached along the outside road; longest walk from parking." },
+    { id: "sbC", name: "Softball Diamond 3", short: "Diamond 3", emoji: "⚾", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 36.8, y: 83.7, r: 7.8, facility: "sbC",
+      fieldInfo: "Lower-left diamond. Skinned infield, backstop cage, bleachers and lights. 543 ft span up to Diamond 1.", uses: "Weeknight adult leagues.", accessibility: "Short walk from the south end of the parking lot." },
+    { id: "sbD", name: "Softball Diamond 4", short: "Diamond 4", emoji: "⚾", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 83.2, y: 83.7, r: 7.8, facility: "sbD",
+      fieldInfo: "Lower-right diamond. Skinned infield, backstop cage, bleachers and lights. 536 ft span across to Diamond 3.", uses: "Leagues, youth baseball, kickball, open play when available.", accessibility: "Reached along the outside road." },
 
-    { id: "soccerN", name: "Soccer / Football — North", short: "Soccer N", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 50.4, y: 11.3, w: 18.8, h: 17.9, lx: 59.8, ly: 25, facility: "soccerN",
-      fieldInfo: "180 × 120 ft small-sided area (60 × 40 yd) laid out across the open space between Diamonds A and B.", uses: "Small-sided soccer and football, youth training, warm-ups. Portable goals only — no permanent posts.", accessibility: "Level grass; nearest to the north end of the field." },
-    { id: "soccerS", name: "Soccer / Football — South", short: "Soccer S", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 50.4, y: 71.7, w: 18.8, h: 17.9, lx: 59.8, ly: 86.5, facility: "soccerS",
-      fieldInfo: "180 × 120 ft small-sided area (60 × 40 yd) in the open space between Diamonds C and D.", uses: "Small-sided soccer and football, youth training, pickup games. Portable goals only.", accessibility: "Level grass; close to the south end of the outside road." },
-    { id: "soccerW", name: "Soccer / Football — West", short: "Soccer W", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 32.4, y: 37.1, w: 12.5, h: 26.8, lx: 38.7, ly: 68, facility: "soccerW",
+    { id: "soccerN", name: "Soccer / Football — North", short: "", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 50.4, y: 11.3, w: 18.8, h: 17.9, facility: "soccerN",
+      fieldInfo: "180 × 120 ft small-sided area (60 × 40 yd) laid out across the open space between Diamonds 1 and 2.", uses: "Small-sided soccer and football, youth training, warm-ups. Portable goals only — no permanent posts.", accessibility: "Level grass; nearest to the north end of the field." },
+    { id: "soccerS", name: "Soccer / Football — South", short: "", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 50.4, y: 71.7, w: 18.8, h: 17.9, facility: "soccerS",
+      fieldInfo: "180 × 120 ft small-sided area (60 × 40 yd) in the open space between Diamonds 3 and 4.", uses: "Small-sided soccer and football, youth training, pickup games. Portable goals only.", accessibility: "Level grass; close to the south end of the outside road." },
+    { id: "soccerW", name: "Soccer / Football — West", short: "", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 32.4, y: 37.1, w: 12.5, h: 26.8, facility: "soccerW",
       fieldInfo: "180 × 120 ft small-sided area running north–south alongside the cricket ground, on the parking-lot side.", uses: "Small-sided soccer and football, training grids, pickup games. Portable goals only.", accessibility: "Closest marked area to the parking lot and restrooms." },
-    { id: "soccerE", name: "Soccer / Football — East", short: "Soccer E", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 74.6, y: 37.1, w: 12.5, h: 26.8, lx: 80.9, ly: 68, facility: "soccerE",
+    { id: "soccerE", name: "Soccer / Football — East", short: "", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 74.6, y: 37.1, w: 12.5, h: 26.8, facility: "soccerE",
       fieldInfo: "180 × 120 ft small-sided area running north–south on the far side of the cricket ground.", uses: "Small-sided soccer and football, training grids, pickup games. Portable goals only.", accessibility: "Reached along the outside road on the east side." },
 
     { id: "parking", name: "Parking (west lot)", short: "Parking", kind: "Parking", sport: null, shape: "rect", x: 6, y: 12, w: 16, h: 76,
       fieldInfo: "Unpaved lot along the west side of the field.", uses: "Visitor parking, team drop-off.", accessibility: "Level; short walk to the field entrance." },
     { id: "restrooms", name: "Restrooms & Storage", short: "Restrooms", kind: "Restrooms", sport: null, shape: "pin", x: 27.1, y: 55.6,
       fieldInfo: "Building between the parking lot and the field.", uses: "Open during facility hours.", accessibility: "Level approach from parking." },
-    { id: "entranceMain", name: "Field Entrance (from parking)", short: "Field entrance", kind: "Entrance", sport: null, shape: "pin", x: 49.5, y: 10.1,
-      fieldInfo: "Main pedestrian entry onto the field, at the upper-left edge of the outfield.", uses: "Arrival, drop-off, wayfinding.", accessibility: "Firm surface from the parking lot to the grass edge." }
+    { id: "entranceMain", name: "Field Entrance (from parking)", short: "Entrance", kind: "Entrance", sport: null, shape: "pin", x: 14, y: 7,
+      fieldInfo: "Main pedestrian entry, at the north end of the parking lot.", uses: "Arrival, drop-off, wayfinding.", accessibility: "Firm surface from the parking lot to the grass edge." }
   ],
 
   /* ------------------------------------------------------------------
@@ -335,7 +345,7 @@ window.HJELTE = {
     partners: ["Los Angeles Cricket", "City of Los Angeles Department of Recreation and Parks (facility)", "Community volunteers"],
     status: "COMPLETED",
     lead: "Los Angeles Cricket",
-    geometry: [["Prepared pitch", "20 × 80 ft (6.67 × 26.67 yd)"], ["Boundary radius", "210 ft (70 yd)"], ["Boundary diameter", "420 ft (140 yd)"], ["Boundary circumference", "1,319.5 ft (439.8 yd)"], ["Home-plate spans", "A–B 544 ft · C–D 536 ft · A–C 543 ft · B–D 539 ft"]],
+    geometry: [["Prepared pitch", "20 × 80 ft (6.67 × 26.67 yd)"], ["Boundary radius", "210 ft (70 yd)"], ["Boundary diameter", "420 ft (140 yd)"], ["Boundary circumference", "1,319.5 ft (439.8 yd)"], ["Home-plate spans", "1–2 544 ft · 3–4 536 ft · 1–3 543 ft · 2–4 539 ft"]],
     documents: [
       { label: "Ground plan & dimensions", file: "assets/img/lac-ground-specs.jpg", caption: "Enhanced aerial concept with measured spans. Google Maps estimates, not a survey." },
       { label: "Visitor guide", file: "assets/img/cricket-visitor-guide.jpg", caption: "Quick guide for park visitors when cricket is in progress." }
@@ -368,7 +378,7 @@ window.HJELTE = {
       lead: "Open to a lead organization", partners: [], goal: 15000, raised: 0,
       volunteer: "Walk-through audits, prioritizing the list, quick-fix days" },
     { id: "shade", area: "Seating & shade", title: "Shade Structures at the Diamond Cluster", status: "FUNDRAISING",
-      description: "Two shade canopies over the shared bleachers between Diamonds A–D.",
+      description: "Two shade canopies over the shared bleachers between Diamonds 1–4.",
       impact: "Cooler, safer spectating for families across all softball programs on hot Valley afternoons.",
       lead: "Community coalition", partners: ["Local businesses", "Softball leagues"], goal: 18000, raised: 6400,
       volunteer: "Fundraising committee, install-day helpers" },
@@ -415,7 +425,7 @@ window.HJELTE = {
      ------------------------------------------------------------------ */
   worklog: [
     { id: "w1", date: "2026-09-12", organization: "Los Angeles Cricket", groupId: "lac", activity: "Cricket pitch mowing, rolling and crease re-marking", area: "Fields & turf", hours: 14, volunteers: 5, materials: "Line paint, fuel", value: 120, verified: true },
-    { id: "w2", date: "2026-09-06", organization: "Valley Evening Softball League", groupId: "ex-softball-league", activity: "Infield dragging and base-peg repair, Diamonds C–D", area: "Fields & turf", hours: 9, volunteers: 4, materials: "Base pegs", value: 60, verified: true, example: true },
+    { id: "w2", date: "2026-09-06", organization: "Valley Evening Softball League", groupId: "ex-softball-league", activity: "Infield dragging and base-peg repair, Diamonds 3–4", area: "Fields & turf", hours: 9, volunteers: 4, materials: "Base pegs", value: 60, verified: true, example: true },
     { id: "w3", date: "2026-08-30", organization: "Basin Walk & Talk Club", groupId: "ex-walk-club", activity: "Perimeter road litter pickup", area: "Facility updates", hours: 6, volunteers: 6, materials: "Bags, gloves", value: 25, verified: true, example: true },
     { id: "w4", date: "2026-08-23", organization: "Los Angeles Cricket", groupId: "lac", activity: "Outfield irrigation dry-spot survey shared with facility staff", area: "Water & irrigation", hours: 4, volunteers: 2, materials: "", value: 0, verified: true },
     { id: "w5", date: "2026-08-16", organization: "Basin Youth Soccer Academy", groupId: "ex-youth-soccer", activity: "Portable goal repair and net replacement", area: "Equipment", hours: 5, volunteers: 3, materials: "Two nets", value: 180, verified: false, example: true },
@@ -429,7 +439,7 @@ window.HJELTE = {
   updates: [
     { id: "u1", createdAt: "2026-09-17T18:00:00", author: "Los Angeles Cricket", sport: "cricket", groupId: "lac", title: "Cricket Community Open Day this Saturday", body: "Free intro session 9 AM – 1 PM on the cricket ground. Bats and balls provided; wear trainers and bring water." },
     { id: "u2", createdAt: "2026-09-15T09:30:00", author: "Hub maintainers", sport: "all", groupId: null, title: "Outfield irrigation repair in progress", body: "Expect hoses and marked dry spots on the south half of the outfield through the end of the month. Soccer and ultimate groups are using the north half where needed." },
-    { id: "u3", createdAt: "2026-09-10T16:15:00", author: "Hub maintainers", sport: "softball", groupId: null, title: "Diamond A lights back on", body: "The two failed fixtures on Diamond A were replaced. Evening league play resumes on the normal schedule." }
+    { id: "u3", createdAt: "2026-09-10T16:15:00", author: "Hub maintainers", sport: "softball", groupId: null, title: "Diamond 1 lights back on", body: "The two failed fixtures on Diamond 1 were replaced. Evening league play resumes on the normal schedule." }
   ],
 
   /* ------------------------------------------------------------------

@@ -574,18 +574,29 @@
       const g = svgEl("g", { class: "hotspot", tabindex: "0", role: "button", "aria-label": loc.name, "data-id": loc.id });
       if (loc.sport) g.style.setProperty("--sport-fill", sport(loc.sport).color + "66");
       const lx = (loc.lx !== undefined ? loc.lx : loc.x) / 100 * W, ly = (loc.ly !== undefined ? loc.ly : loc.y) / 100 * H;
-      const shortName = loc.short || loc.name.replace("Softball ", "").replace(" (west lot)", "").replace(" & Picnic Area", "").replace("Los Angeles ", "");
+      const shortName = loc.short !== undefined ? loc.short : loc.name.replace("Softball ", "").replace(" (west lot)", "").replace(" & Picnic Area", "").replace("Los Angeles ", "");
+      // A location can carry an emoji badge; when it has no short name the
+      // badge stands alone (the soccer areas), otherwise it sits above the label.
+      const addLabel = (gx, gy) => {
+        if (loc.emoji) {
+          const e = svgEl("text", { class: "map-emoji", x: gx, y: shortName ? gy - 12 : gy + 9, "text-anchor": "middle" });
+          e.textContent = loc.emoji; g.appendChild(e);
+        }
+        if (!shortName) return;
+        const t = svgEl("text", { x: gx, y: loc.emoji ? gy + 18 : gy, "text-anchor": "middle" });
+        t.textContent = shortName; g.appendChild(t);
+      };
       if (loc.shape === "none") {
         // listed in the chips and the detail card, but draws no shape of its own
       } else if (loc.shape === "circle") {
         const r = loc.r / 100 * W;
         g.appendChild(svgEl("circle", { class: "shape", cx, cy, r }));
-        const t = svgEl("text", { x: lx, y: loc.ly !== undefined ? ly : cy + 4, "text-anchor": "middle" }); t.textContent = shortName; g.appendChild(t);
+        addLabel(lx, loc.ly !== undefined ? ly : cy + 4);
         shapes.appendChild(g);
       } else if (loc.shape === "rect") {
         const x = loc.x / 100 * W, y = loc.y / 100 * H, w = loc.w / 100 * W, h = loc.h / 100 * H;
         g.appendChild(svgEl("rect", { class: "shape", x, y, width: w, height: h, rx: 8 }));
-        if (!loc.noLabel) { const t = svgEl("text", { x: loc.lx !== undefined ? lx : x + w / 2, y: loc.ly !== undefined ? ly : y + h / 2 + 4, "text-anchor": "middle" }); t.textContent = shortName; g.appendChild(t); }
+        if (!loc.noLabel) addLabel(loc.lx !== undefined ? lx : x + w / 2, loc.ly !== undefined ? ly : y + h / 2 + 4);
         if (loc.id === "outfield") shapes.prepend(g); else shapes.appendChild(g);
       } else {
         const glyph = { Entrance: "M12 4v16M5 12l7 7 7-7", Restrooms: "M9 5a2 2 0 1 0 0 .01M15 5a2 2 0 1 0 0 .01M7 9h4v6l1 5M17 9h-4l-1 6-1 5", Seating: "M4 9h16v3H4zM6 12v7M18 12v7M4 15h16", Path: "M6 20c4-6 8-2 12-8" }[loc.kind] || "M12 8v8M8 12h8";
@@ -808,8 +819,26 @@
     $$("[data-count]").forEach((el) => { if (el.closest(".in")) countUp(el); });
   }
   window.HJELTE_RERENDER = renderAll;
+  /* The diamonds are labelled 1–4 on this site. Sheet rows seeded before the
+     change still say "Diamond A", so normalise the text fields on the way in
+     rather than leaving the map and the schedule disagreeing. */
+  const DIAMOND_NUM = { A: "1", B: "2", C: "3", D: "4" };
+  function normalizeDiamonds() {
+    const fix = (v) => typeof v === "string"
+      ? v.replace(/\bDiamonds?\s+[A-D](\s*[–-]\s*[A-D])?\b/g, (m) => m.replace(/[A-D]/g, (c) => DIAMOND_NUM[c]))
+      : v;
+    const pass = (rows, keys) => (rows || []).forEach((r) => keys.forEach((k) => { r[k] = fix(r[k]); }));
+    pass(D.schedule, ["title", "notes"]);
+    pass(D.specialEvents, ["title", "note"]);
+    pass(D.groups, ["description", "description_es"]);
+    pass(D.updates, ["title", "body", "title_es", "body_es"]);
+    pass(D.projects, ["title", "description", "impact"]);
+    pass(D.worklog, ["activity"]);
+  }
+
+  normalizeDiamonds();
   renderMap(); renderAll(); observeReveals(); I18.init();
-  loadRemote().then((ok) => { if (ok) { renderAll(); observeReveals(); I18.apply(); } });
+  loadRemote().then((ok) => { if (ok) { normalizeDiamonds(); renderAll(); observeReveals(); I18.apply(); } });
   // hero content should be visible immediately
   requestAnimationFrame(() => $$(".hero .reveal").forEach((el) => el.classList.add("in")));
   // deep link support: index.html#sport-cricket opens that sport's panel

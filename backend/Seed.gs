@@ -77,7 +77,7 @@ const SEED_GROUPS = [
     "social": "",
     "socialHandle": "",
     "email": "",
-    "description": "Sample listing. Youth fast-pitch program with weekday practices and Saturday game days on Diamonds A–B.",
+    "description": "Sample listing. Youth fast-pitch program with weekday practices and Saturday game days on Diamonds 1–2.",
     "description_es": "",
     "logoUrl": "",
     "status": "approved",
@@ -101,7 +101,7 @@ const SEED_GROUPS = [
     "social": "",
     "socialHandle": "",
     "email": "",
-    "description": "Sample listing. Youth baseball program using Diamond B for weekday practices and Sunday games.",
+    "description": "Sample listing. Youth baseball program using Diamond 2 for weekday practices and Sunday games.",
     "description_es": "",
     "logoUrl": "",
     "status": "approved",
@@ -269,7 +269,7 @@ const SEED_GROUPS = [
     "social": "",
     "socialHandle": "",
     "email": "",
-    "description": "Sample listing. Casual Friday-evening kickball on Diamond D when available.",
+    "description": "Sample listing. Casual Friday-evening kickball on Diamond 4 when available.",
     "description_es": "",
     "logoUrl": "",
     "status": "approved",
@@ -352,7 +352,7 @@ const SEED_SCHEDULE = [
     "facility": "sbA",
     "type": "Maintenance",
     "category": "maintenance",
-    "title": "Infield grooming — Diamonds A–B",
+    "title": "Infield grooming — Diamonds 1–2",
     "notes": ""
   },
   {
@@ -680,7 +680,7 @@ const SEED_EVENTS = [
     "facility": "sbA",
     "type": "Tournament",
     "category": "permitted",
-    "note": "Sample event. Diamonds A–D reserved all day."
+    "note": "Sample event. Diamonds 1–4 reserved all day."
   },
   {
     "id": "e4",
@@ -740,8 +740,8 @@ const SEED_UPDATES = [
     "author": "Hub maintainers",
     "sport": "softball",
     "groupId": "",
-    "title": "Diamond A lights back on",
-    "body": "The two failed fixtures on Diamond A were replaced. Evening league play resumes on the normal schedule.",
+    "title": "Diamond 1 lights back on",
+    "body": "The two failed fixtures on Diamond 1 were replaced. Evening league play resumes on the normal schedule.",
     "title_es": "",
     "body_es": "",
     "sentAt": ""
@@ -795,7 +795,7 @@ const SEED_PROJECTS = [
     "area": "Seating & shade",
     "title": "Shade Structures at the Diamond Cluster",
     "status": "FUNDRAISING",
-    "description": "Two shade canopies over the shared bleachers between Diamonds A–D.",
+    "description": "Two shade canopies over the shared bleachers between Diamonds 1–4.",
     "impact": "Cooler, safer spectating for families across all softball programs on hot Valley afternoons.",
     "lead": "Community coalition",
     "partners": "Local businesses|Softball leagues",
@@ -923,7 +923,7 @@ const SEED_WORKLOG = [
     "date": "2026-09-06",
     "organization": "Valley Evening Softball League",
     "groupId": "ex-softball-league",
-    "activity": "Infield dragging and base-peg repair, Diamonds C–D",
+    "activity": "Infield dragging and base-peg repair, Diamonds 3–4",
     "area": "Fields & turf",
     "hours": 9,
     "volunteers": 4,
@@ -1012,4 +1012,68 @@ function clearSampleData() {
   sampleIds.forEach(function (id) { deleteRowBy("Groups", "id", id); });
   Logger.log("Removed " + sampleIds.length + " sample groups and their rows.");
   touch();
+}
+
+/* ---------------------------------------------------------------------
+   One-shot: apply the weekend programme to the live sheet.
+   Saturday and Sunday — adult softball on Diamond 3 (sbC) 9–11, field
+   maintenance 11–1, Los Angeles Cricket 1–6 — plus the dated LAC practice
+   and the two match days. Also renumbers "Diamond A–D" text to 1–4.
+   Safe to run twice: existing matching rows are removed first.
+   --------------------------------------------------------------------- */
+function applyWeekendSchedule() {
+  const WEEKEND = [
+    { day: 0, start: "09:00", end: "11:00", sport: "softball",  groupId: "",    facility: "sbC",      type: "League",      category: "permitted",   title: "Adult softball — league play" },
+    { day: 0, start: "11:00", end: "13:00", sport: "community", groupId: "",    facility: "outfield", type: "Maintenance", category: "maintenance", title: "Field maintenance" },
+    { day: 0, start: "13:00", end: "18:00", sport: "cricket",   groupId: "lac", facility: "cricket",  type: "Practice",    category: "permitted",   title: "" },
+    { day: 6, start: "09:00", end: "11:00", sport: "softball",  groupId: "",    facility: "sbC",      type: "League",      category: "permitted",   title: "Adult softball — league play" },
+    { day: 6, start: "11:00", end: "13:00", sport: "community", groupId: "",    facility: "outfield", type: "Maintenance", category: "maintenance", title: "Field maintenance" },
+    { day: 6, start: "13:00", end: "18:00", sport: "cricket",   groupId: "lac", facility: "cricket",  type: "Practice",    category: "permitted",   title: "" }
+  ];
+  const EVENTS = [
+    { date: "2026-09-25", start: "15:00", end: "17:00", title: "Los Angeles Cricket — practice", sport: "cricket", groupId: "lac", facility: "cricket", type: "Practice", category: "permitted",
+      note: "Squad practice on the cricket ground. Please stay outside the boundary while play is on." },
+    { date: "2026-09-26", start: "13:00", end: "18:00", title: "Los Angeles Cricket — match", sport: "cricket", groupId: "lac", facility: "cricket", type: "Game", category: "permitted",
+      note: "Rope boundary in place. Spectators welcome along the west side of the ground." },
+    { date: "2026-09-27", start: "13:00", end: "18:00", title: "Los Angeles Cricket — match", sport: "cricket", groupId: "lac", facility: "cricket", type: "Game", category: "permitted",
+      note: "Rope boundary in place. Spectators welcome along the west side of the ground." }
+  ];
+
+  // the old all-morning weekend cricket block now sits inside the maintenance window
+  rows("Schedule").forEach(function (r) {
+    if ((Number(r.day) === 0 || Number(r.day) === 6) && r.facility === "cricket" &&
+        String(r.start) === "09:00" && String(r.type) === "Youth Program") deleteRowBy("Schedule", "id", r.id);
+  });
+  // drop anything this function added before, so a re-run does not duplicate
+  rows("Schedule").forEach(function (r) {
+    if (String(r.id).indexOf("wk-") === 0) deleteRowBy("Schedule", "id", r.id);
+  });
+  rows("Events").forEach(function (r) {
+    if (String(r.id).indexOf("lacw-") === 0) deleteRowBy("Events", "id", r.id);
+  });
+
+  WEEKEND.forEach(function (e, i) { e.id = "wk-" + i; upsertRow("Schedule", "id", e); });
+  EVENTS.forEach(function (e, i) { e.id = "lacw-" + i; upsertRow("Events", "id", e); });
+
+  // "Diamond A" -> "Diamond 1" everywhere the sheets carry free text
+  const NUM = { A: "1", B: "2", C: "3", D: "4" };
+  const fix = function (v) {
+    return typeof v === "string"
+      ? v.replace(/\bDiamonds?\s+[A-D](\s*[–-]\s*[A-D])?\b/g, function (m) {
+          return m.replace(/Diamond(s?)/, "\u0000$1").replace(/[A-D]/g, function (c) { return NUM[c]; }).replace(/\u0000/, "Diamond");
+        })
+      : v;
+  };
+  [["Schedule", ["title", "notes"]], ["Events", ["title", "note"]], ["Groups", ["description", "description_es"]],
+   ["Updates", ["title", "body"]], ["Projects", ["title", "description", "impact"]], ["WorkLog", ["activity"]]]
+    .forEach(function (pair) {
+      rows(pair[0]).forEach(function (r) {
+        let changed = false;
+        pair[1].forEach(function (k) { const v = fix(r[k]); if (v !== r[k]) { r[k] = v; changed = true; } });
+        if (changed) upsertRow(pair[0], "id", r);
+      });
+    });
+
+  touch();
+  Logger.log("Weekend programme applied: " + WEEKEND.length + " schedule rows, " + EVENTS.length + " events.");
 }
