@@ -31,6 +31,15 @@
   const sport = (id) => D.sports.find((s) => s.id === id) || (id && console.warn("Unknown sport id:", id), D.sports.find((s) => s.id === id) || UNKNOWN_SPORT);
   const group = (id) => D.groups.find((g) => g.id === id) || null;
   const facility = (id) => D.facilities.find((f) => f.id === id) || null;
+  // Only the Groups sheet carries an `example` column, so a schedule / event /
+  // work-log row is a placeholder when its own flag says so OR when it belongs
+  // to a sample group. Headline totals must never count placeholder rows.
+  const isSample = (x) => {
+    if (!x) return false;
+    if (x.example === true || x.example === "TRUE" || x.example === "true") return true;
+    const g = x.groupId ? group(x.groupId) : null;
+    return !!(g && g.example);
+  };
   const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const sportStyle = (id) => { const s = sport(id); return `--sport:${s.color};--sport-tint:${s.color}22`; };
   const badgeClass = (b) => {
@@ -258,7 +267,7 @@
     return `<article class="activity${isNow ? " is-now" : ""}" style="${sportStyle(e.sport)}">
       <div class="activity-time">${fmtTime(e.start)}<small>to ${fmtTime(e.end)}${isNow ? " · now" : ""}</small></div>
       <div class="activity-main">
-        <div class="activity-title">${esc(titleOf(e))} ${g && g.example ? '<span class="tag tag-example">Sample</span>' : ""} ${e.special ? '<span class="tag" style="background:var(--gold-light);color:var(--gold-dark)">Special</span>' : ""}</div>
+        <div class="activity-title">${esc(titleOf(e))} ${isSample(e) || (g && g.example) ? '<span class="tag tag-example">Sample</span>' : ""} ${e.special ? '<span class="tag" style="background:var(--gold-light);color:var(--gold-dark)">Special</span>' : ""}</div>
         <div class="activity-meta">
           <span class="tag tag-sport">${esc(s.name)}</span>
           <span class="tag">${esc(e.type)}</span>
@@ -730,12 +739,12 @@
     const all = D.worklog || [];
     // Headline totals count verified, non-sample entries only — published numbers
     // on a civic page should never include placeholder rows.
-    const w = all.filter((x) => !x.example);
+    const w = all.filter((x) => !isSample(x));
     const hours = w.reduce((a, x) => a + Number(x.hours || 0), 0), vols = w.reduce((a, x) => a + Number(x.volunteers || 0), 0), value = w.reduce((a, x) => a + Number(x.value || 0), 0);
     $("#stewardStats").innerHTML = [[hours, "Volunteer hours"], [vols, "Volunteer shifts"], [w.length, "Work days"], [money(value), "Materials & services"]].map(([v, l]) => `<li><strong>${v}</strong><span>${l}</span></li>`).join("");
     $("#worklogList").innerHTML = all.length ? [...all].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 8).map((x) => `<article class="work">
       <time>${x.date ? fmtDate(parseISO(x.date), { month: "short", day: "numeric", year: "numeric" }) : "—"}</time>
-      <div><b>${esc(x.activity)}</b><span>${esc(x.organization)}${x.area ? ` · ${esc(x.area)}` : ""}${x.example ? ' <span class="tag tag-example">Sample</span>' : ""}</span></div>
+      <div><b>${esc(x.activity)}</b><span>${esc(x.organization)}${x.area ? ` · ${esc(x.area)}` : ""}${isSample(x) ? ' <span class="tag tag-example">Sample</span>' : ""}</span></div>
       <div class="work-nums"><span>${Number(x.hours || 0)} hrs</span><span>${Number(x.volunteers || 0)} people</span>${x.value ? `<span>${money(x.value)}</span>` : ""}<span class="tag ${x.verified ? "tag-ok" : ""}">${x.verified ? "Verified" : "Pending"}</span></div></article>`).join("") : `<p class="empty-note">No work logged yet.</p>`;
     const byOrg = {}; w.forEach((x) => { byOrg[x.organization] = (byOrg[x.organization] || 0) + Number(x.hours || 0); });
     if (!Object.keys(byOrg).length) $("#orgBars").innerHTML = "";
