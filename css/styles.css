@@ -13,13 +13,15 @@
   --off-2: #ECEAE3;
   --line: #E1DED5;
   --line-dark: rgba(255,255,255,.12);
-  --muted: #6B7076;
-  --muted-2: #8A8F95;
-  --grass: #2E7D4F;
-  --grass-dark: #256A42;
-  --grass-light: #E4EFE7;
+  --muted: #5F6469;
+  --muted-2: #6E7379;
+  /* House green is deliberately distinct from the cricket sport colour
+     (#2E7D4F) so no single sport owns the brand. */
+  --grass: #1F6B4A;
+  --grass-dark: #17553A;
+  --grass-light: #E2EDE7;
   --gold: #C9A227;
-  --gold-dark: #A88618;
+  --gold-dark: #7A5D10;
   --gold-light: #F7F0D8;
 
   --display: "Barlow Condensed", "Arial Narrow", sans-serif;
@@ -118,7 +120,15 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
   -webkit-backdrop-filter: saturate(160%) blur(12px); border-color: var(--line); box-shadow: 0 1px 0 rgba(28,31,34,.02);
 }
 .header-inner { height: 100%; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
-.brand { display: inline-flex; align-items: center; gap: 12px; flex: none; }
+.brand { display: inline-flex; align-items: center; gap: 12px; flex: none; min-width: 0; }
+@media (max-width: 1023.98px) {
+  .brand { flex: 1 1 auto; }
+  .brand-text { min-width: 0; }
+  .brand-name { font-size: .95rem; overflow: hidden; text-overflow: ellipsis; }
+  .brand-sub { display: none; }
+  .nav-toggle { flex: none; }
+}
+@media (max-width: 400px) { .brand-name { font-size: .88rem; } .brand-mark svg { width: 28px; height: 28px; } }
 .brand-text { display: flex; flex-direction: column; line-height: 1; }
 .brand-name { font-family: var(--display); font-weight: 700; text-transform: uppercase; letter-spacing: .08em; font-size: 1.05rem; white-space: nowrap; }
 .brand-sub { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; opacity: .7; margin-top: 3px; }
@@ -258,7 +268,7 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .tag-cat.community { border-style: dashed; }
 .tag-cat.open { background: var(--grass-light); border-color: transparent; color: var(--grass-dark); }
 .tag-cat.maintenance { background: repeating-linear-gradient(135deg, #EEEDE8 0 4px, #E1DED5 4px 8px); color: var(--ink-3); }
-.tag-example { background: var(--gold-light); color: var(--gold-dark); }
+.tag-example { background: #fff; color: var(--ink-3); border: 1px solid var(--ink-3); }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--sport); display: inline-block; }
 .activity-note { font-size: .85rem; color: var(--ink-3); margin: 0; }
 .activity-list .empty-note { grid-column: 1 / -1; }
@@ -302,7 +312,7 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .wg-event.open { background: var(--grass-light); border-left-color: var(--grass); }
 .wg-event.maintenance { background: repeating-linear-gradient(135deg, #F1F0EB 0 6px, #E4E2DA 6px 12px); border-left-color: var(--muted-2); color: var(--ink-3); }
 
-.week-list { display: grid; gap: 12px; }
+@media (max-width: 1023.98px) { .week-list { display: grid; gap: 12px; } .week-list[hidden] { display: none; } }
 .wl-day { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .wl-day > summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; font-family: var(--display); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; font-size: 1.05rem; }
 .wl-day > summary::-webkit-details-marker { display: none; }
@@ -342,7 +352,7 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .chip .dot { width: 7px; height: 7px; }
 .directory-block { margin-bottom: 48px; }
 .directory-head { display: grid; gap: 4px; margin-bottom: 20px; }
-.directory-head::before { content: ""; width: 44px; height: 4px; border-radius: 2px; background: var(--gold); margin-bottom: 10px; }
+.directory-head::before { content: ""; width: 44px; height: 4px; border-radius: 2px; background: var(--ink); margin-bottom: 10px; }
 .directory-head p { color: var(--muted); margin: 0; max-width: 70ch; }
 .group-grid { display: grid; gap: 16px; }
 @media (min-width: 640px) { .group-grid { grid-template-columns: repeat(2, 1fr); } }
@@ -557,6 +567,7 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
   html { scroll-behavior: auto; }
   .reveal { opacity: 1; transform: none; transition: none; }
   .btn, .sport-card, .group-card, .project-card, .contribute-card, .activity, .wg-event { transition: none; }
+  .progress-bar i, .org-bar i { transition: none; }
   .modal-backdrop, .modal-panel { animation: none; }
 }
 
@@ -574,10 +585,13 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .phase-cap { right: 44%; }
 
 /* ---------- Facility map: to-scale base drawing & transparent hotspots ---------- */
-.hotspot .shape { fill: transparent; stroke: transparent; stroke-width: 2; transition: fill .2s, stroke .2s, filter .2s; }
-.hotspot:hover .shape, .hotspot:focus-visible .shape { fill: rgba(255,255,255,.14); stroke: rgba(255,255,255,.9); filter: none; }
+.hotspot .shape { fill: rgba(255,255,255,.07); stroke: rgba(255,255,255,.45); stroke-width: 1.5; stroke-dasharray: 6 5; transition: fill .2s, stroke .2s, filter .2s; }
+.hotspot:hover .shape, .hotspot:focus-visible .shape { fill: rgba(255,255,255,.18); stroke: rgba(255,255,255,.95); stroke-dasharray: none; stroke-width: 2.5; }
+.hotspot:focus-visible .pin-body { stroke: var(--gold); stroke-width: 4; filter: drop-shadow(0 0 8px rgba(201,162,39,.8)); }
+@media (hover: none) { .hotspot .shape { stroke-dasharray: none; stroke-width: 2; stroke: rgba(255,255,255,.6); } }
 .hotspot.is-active .shape { fill: var(--sport-fill, rgba(255,255,255,.18)); stroke: var(--gold); stroke-width: 3; filter: drop-shadow(0 0 12px rgba(201,162,39,.6)); }
-.hotspot text { font-size: 13px; }
+.hotspot text { font-size: 20px; }
+@media (max-width: 1023.98px) { .hotspot text { font-size: 30px; } .map-road-label { font-size: 18px; } .map-dim-labels text { font-size: 17px; } .map-dim-labels rect { transform: scale(1.45); transform-origin: center; transform-box: fill-box; } }
 .map-dim-labels rect { fill: rgba(28,31,34,.78); }
 .map-dim-labels rect.cyan { fill: rgba(20,110,120,.9); }
 .map-dim-labels rect.gold { fill: rgba(140,110,30,.92); }
@@ -695,3 +709,66 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .doc b { display: block; font-family: var(--display); font-size: 1.1rem; }
 .doc small { color: rgba(255,255,255,.65); font-size: .8rem; }
 .live-data .slot-label { display: none; }
+
+
+/* ---------- Touch targets ---------- */
+@media (pointer: coarse) {
+  .btn, .chip, .tab, .lang-toggle button, .link-icon { min-height: 44px; }
+  .chip { padding-block: 11px; }
+  .lang-toggle button { padding: 11px 14px; }
+  .sub-sports input, .radio-row input, .form-grid input[type="checkbox"] { width: 22px; height: 22px; }
+  .sub-sports label, .radio-row label { min-height: 44px; align-items: center; }
+  .nav-toggle { padding: 12px; }
+}
+
+/* ---------- Mobile filter rows: label on its own line, sport row scrolls ---------- */
+@media (max-width: 719.98px) {
+  .chip-row { display: block; }
+  .chip-row .chip { margin: 0 4px 6px 0; }
+  .chip-label { display: block; margin-bottom: 6px; }
+  .chip-rows > .chip-row[data-filter="sport"] { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 6px; padding-bottom: 6px; }
+  .chip-rows > .chip-row[data-filter="sport"] .chip-label { position: sticky; left: 0; }
+  .chip-rows > .chip-row[data-filter="sport"] .chip { flex: none; margin: 0; }
+  .more-filters > summary { cursor: pointer; list-style: none; display: inline-flex; align-items: center; gap: 8px; font-size: .82rem; font-weight: 600; color: var(--ink-3); padding: 11px 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; }
+  .more-filters > summary::-webkit-details-marker { display: none; }
+  .more-filters > summary::after { content: "▾"; }
+  .more-filters[open] > summary::after { content: "▴"; }
+  .more-filters[open] .chip-rows { margin-top: 12px; }
+}
+@media (min-width: 720px) { .more-filters > summary { display: none; } }
+
+/* ---------- Quieter small labels (uppercase reserved for the wordmark,
+     section eyebrows and schedule day heads) ---------- */
+.badge, .status, .tag, .chip-label, .map-card dt, .fact dt, .info-list dt,
+.stats-strip span:last-child, .stats-row span, .filter-bar label,
+.roster-table th, .admin-table th, .pill { text-transform: none; letter-spacing: .01em; }
+.badge, .status, .pill { font-size: .72rem; }
+.tag { font-size: .74rem; }
+.chip-label, .filter-bar label { font-size: .76rem; }
+.map-card dt, .fact dt, .info-list dt, .stats-strip span:last-child, .stats-row span { font-size: .78rem; }
+
+/* ---------- Sample listings: keep the tag clear of the group name ---------- */
+.group-top { padding-right: 76px; }
+.group-card .sample-tag { top: 14px; }
+.group-grid, .project-grid { align-items: start; }
+
+/* ---------- Form field errors ---------- */
+.field-error { display: flex; gap: 6px; align-items: center; font-size: .78rem; color: #A33C2C; font-weight: 500; margin-top: 2px; }
+.field-error::before { content: "!"; width: 15px; height: 15px; border-radius: 50%; background: #A33C2C; color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; flex: none; }
+.form-grid input.touched:invalid, .form-grid select.touched:invalid, .form-grid textarea.touched:invalid { border-color: #A33C2C; box-shadow: 0 0 0 2px rgba(163,60,44,.12); }
+.form-status.is-error { color: #A33C2C; }
+
+/* ---------- Permit note ---------- */
+.permit-note { border-top: 1px solid var(--line-dark); margin-top: 24px; padding-top: 20px; }
+.permit-note h3 { font-size: 1.3rem; margin-bottom: 8px; }
+.permit-note p { font-size: .92rem; color: rgba(255,255,255,.78); margin: 0; }
+.permit-note a { color: var(--gold); border-bottom: 1px solid rgba(201,162,39,.4); }
+
+/* ---------- Overflow guards: grid items must be allowed to shrink ---------- */
+.grid-2 > *, .contribute-grid > *, .group-grid > *, .project-grid > *, .sport-grid > * { min-width: 0; }
+.info-list dd, .group-desc, .update p, .work b { overflow-wrap: anywhere; }
+.info-list div { grid-template-columns: 40px minmax(0, 1fr); }
+.contribute-card .btn, .group-links .btn { white-space: normal; }
+@media (min-width: 1024px) and (max-width: 1199.98px) {
+  .contribute-grid { grid-template-columns: repeat(3, 1fr); }
+}

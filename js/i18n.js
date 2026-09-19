@@ -104,6 +104,21 @@
     "A community-maintained information hub for everyone who plays, coaches, volunteers and gathers at Hjelte Sports Center in Encino.": "Un centro de información mantenido por la comunidad para todos los que juegan, entrenan, colaboran y se reúnen en Hjelte Sports Center en Encino.",
     "Schedules, listings and project details are community-provided and may change. Official permits, posted park regulations and City of Los Angeles Department of Recreation and Parks requirements govern facility use.": "Horarios, listados y detalles de proyectos son aportados por la comunidad y pueden cambiar. Los permisos oficiales, el reglamento del parque y los requisitos del Departamento de Recreación y Parques de la Ciudad de Los Ángeles rigen el uso de las instalaciones.",
     "Add your group": "Agrega tu grupo", "Report an update": "Reportar un cambio", "Hjelte Sports Center Community Hub": "Centro Comunitario de Hjelte Sports Center",
+    "Today": "Hoy",
+    "Map": "Mapa",
+    "See What's On Today": "Ver qué hay hoy",
+    "Open the Facility Map": "Abrir el mapa",
+    "Groups & Programs": "Grupos y programas",
+    "More filters": "Más filtros",
+    "Getting a Field Permit at Hjelte": "Cómo obtener un permiso de campo en Hjelte",
+    "Get updates by sport, or everything": "Recibe novedades por deporte o de todo",
+    "Which sports do you want updates about?": "¿Sobre qué deportes quieres novedades?",
+    "Fee": "Cuota",
+    "Hub maintainers": "Administradores del centro",
+    "End time must be after the start time.": "La hora de fin debe ser posterior a la de inicio.",
+    "Selected map location": "Ubicación seleccionada en el mapa",
+    "Subscribe to updates": "Suscribirse a novedades",
+    "Full roster of groups": "Lista completa de grupos",
     "Get updates by sport, or everything": "Recibe novedades por deporte o de todo",
     "Hub maintainers": "Administradores del centro",
     "Community volunteers": "Voluntarios de la comunidad",
@@ -187,6 +202,8 @@
     try { localStorage.setItem(KEY, next); } catch (e) { /* storage unavailable */ }
     if (next === lang) return;
     lang = next; document.documentElement.lang = lang;
+    if (lang === "es") { document.title = "Hjelte Sports Center — Centro Deportivo Comunitario · Encino, CA"; }
+    else { document.title = "Hjelte Sports Center — Community Sports Hub · Encino, CA"; }
     if (observer) { observer.disconnect(); observer = null; }
     restore();
     if (window.HJELTE_RERENDER) window.HJELTE_RERENDER();

@@ -61,3 +61,4 @@
 .pill.warn { background: var(--gold-light); color: var(--gold-dark); }
 .pill.bad { background: #F3E3E0; color: #8A3B2E; }
 .login .form-grid { margin-top: 16px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

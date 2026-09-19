@@ -100,7 +100,7 @@
   function renderTabs() {
     $("#adminTabs").innerHTML = TABS.filter((t) => !t.master || isMaster()).map((t) => {
       const n = t.count ? t.count() : 0;
-      return `<button data-tab="${t.id}" class="${tab === t.id ? "is-active" : ""}">${t.label}${n ? `<span class="n">${n}</span>` : ""}</button>`;
+      return `<button data-tab="${t.id}" aria-current="${tab === t.id ? "true" : "false"}" class="${tab === t.id ? "is-active" : ""}">${t.label}${n ? `<span class="n">${n}</span>` : ""}</button>`;
     }).join("");
     $$("#adminTabs button").forEach((b) => b.addEventListener("click", () => { tab = b.dataset.tab; renderTabs(); render(); }));
   }
@@ -112,12 +112,14 @@
       myGroups().map((g) => `<option value="${g.id}"${sel === g.id ? " selected" : ""}>${esc(g.name)}</option>`).join("");
   }
   function opts(list, sel) { return list.map((o) => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}"${String(sel) === String(v) ? " selected" : ""}>${esc(l)}</option>`; }).join(""); }
-  function table(cols, rows) {
+  function table(cols, rows, caption) {
     if (!rows.length) return `<p class="empty">Nothing here yet.</p>`;
-    return `<div class="admin-table-wrap"><table class="admin-table"><thead><tr>${cols.map((c) => `<th>${c}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
+    const cap = caption || (TABS.find((t) => t.id === tab) || {}).label || "Data";
+    return `<div class="admin-table-wrap" tabindex="0" role="region" aria-label="${esc(cap)}"><table class="admin-table"><caption class="sr-only">${esc(cap)}</caption><thead><tr>${cols.map((c) => `<th scope="col">${c}</th>`).join("")}</tr></thead><tbody>${rows.join("")}</tbody></table></div>`;
   }
-  function actionBtns(editAction, delAction, id) {
-    return `<td class="actions"><button class="btn btn-text" data-act="${editAction}" data-id="${id}">Edit</button><button class="btn btn-text btn-danger" data-act="${delAction}" data-id="${id}">Delete</button></td>`;
+  function actionBtns(editAction, delAction, id, name) {
+    const n = name ? ` ${esc(String(name))}` : "";
+    return `<td class="actions"><button class="btn btn-text" data-act="${editAction}" data-id="${id}" aria-label="Edit${n}">Edit</button><button class="btn btn-text btn-danger" data-act="${delAction}" data-id="${id}" aria-label="Delete${n}">Delete</button></td>`;
   }
   function bindActions() {
     $$("#panel [data-act]").forEach((b) => b.addEventListener("click", () => ACTIONS[b.dataset.act](b.dataset.id)));
@@ -150,7 +152,7 @@
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newSchedule">+ Add weekly block</button>`;
       const rows = [...(data.schedule || [])].sort((a, b) => a.day - b.day || String(a.start).localeCompare(String(b.start))).map((r) => {
         const g = myGroups().find((x) => x.id === r.groupId);
-        return `<tr><td><b>${DAYS[r.day] || "—"}</b></td><td>${fmtTime(r.start)} – ${fmtTime(r.end)}</td><td>${esc(g ? g.name : r.title || "—")}<small>${esc(sportName(r.sport))}</small></td><td>${esc(facName(r.facility))}</td><td>${esc(r.type)}</td><td><span class="pill ${r.category === "permitted" ? "ok" : ""}">${esc(r.category)}</span></td>${actionBtns("editSchedule", "delSchedule", r.id)}</tr>`;
+        return `<tr><td><b>${DAYS[r.day] || "—"}</b></td><td>${fmtTime(r.start)} – ${fmtTime(r.end)}</td><td>${esc(g ? g.name : r.title || "—")}<small>${esc(sportName(r.sport))}</small></td><td>${esc(facName(r.facility))}</td><td>${esc(r.type)}</td><td><span class="pill ${r.category === "permitted" ? "ok" : ""}">${esc(r.category)}</span></td>${actionBtns("editSchedule", "delSchedule", r.id, `${DAYS[r.day] || ""} ${fmtTime(r.start)} ${g ? g.name : r.title || ""}`)}</tr>`;
       });
       P.innerHTML = `<p class="panel-note">Recurring weekly activity. These blocks fill the community schedule grid on the public page.</p>` + table(["Day", "Time", "Group", "Facility", "Type", "Category", ""], rows);
     },
@@ -158,28 +160,28 @@
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newEvent">+ Add dated event</button>`;
       const rows = [...(data.events || [])].sort((a, b) => String(a.date).localeCompare(String(b.date))).map((r) => {
         const g = myGroups().find((x) => x.id === r.groupId);
-        return `<tr><td><b>${esc(r.date)}</b></td><td>${fmtTime(r.start)} – ${fmtTime(r.end)}</td><td>${esc(r.title)}<small>${esc(g ? g.name : sportName(r.sport))}</small></td><td>${esc(facName(r.facility))}</td><td>${esc(r.type)}</td>${actionBtns("editEvent", "delEvent", r.id)}</tr>`;
+        return `<tr><td><b>${esc(r.date)}</b></td><td>${fmtTime(r.start)} – ${fmtTime(r.end)}</td><td>${esc(r.title)}<small>${esc(g ? g.name : sportName(r.sport))}</small></td><td>${esc(facName(r.facility))}</td><td>${esc(r.type)}</td>${actionBtns("editEvent", "delEvent", r.id, r.title)}</tr>`;
       });
       P.innerHTML = `<p class="panel-note">One-off events: tournaments, open days, cleanups, closures. They appear under Today / This Week / Upcoming and in subscriber emails.</p>` + table(["Date", "Time", "Event", "Facility", "Type", ""], rows);
     },
     updates(P, A) {
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newUpdate">+ Post update</button>`;
-      const rows = (data.updates || []).map((u) => `<tr><td>${esc(String(u.createdAt).slice(0, 10))}</td><td><b>${esc(u.title)}</b><small>${esc(String(u.body).slice(0, 90))}${String(u.body).length > 90 ? "…" : ""}</small></td><td>${esc(u.sport === "all" ? "All sports" : sportName(u.sport))}</td><td>${esc(u.author)}</td><td>${u.sentAt ? '<span class="pill ok">Emailed</span>' : '<span class="pill warn">Queued</span>'}</td>${actionBtns("editUpdate", "delUpdate", u.id)}</tr>`);
+      const rows = (data.updates || []).map((u) => `<tr><td>${esc(String(u.createdAt).slice(0, 10))}</td><td><b>${esc(u.title)}</b><small>${esc(String(u.body).slice(0, 90))}${String(u.body).length > 90 ? "…" : ""}</small></td><td>${esc(u.sport === "all" ? "All sports" : sportName(u.sport))}</td><td>${esc(u.author)}</td><td>${u.sentAt ? '<span class="pill ok">Emailed</span>' : '<span class="pill warn">Queued</span>'}</td>${actionBtns("editUpdate", "delUpdate", u.id, u.title)}</tr>`);
       P.innerHTML = `<p class="panel-note">Posts appear in Latest Updates on the public page and go out in the next daily digest to subscribers of that sport.</p>` + table(["Posted", "Update", "Sport", "Author", "Email", ""], rows);
     },
     worklog(P, A) {
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newWork">+ Log work</button>`;
-      const rows = (data.worklog || []).map((w) => `<tr><td>${esc(w.date)}</td><td><b>${esc(w.activity)}</b><small>${esc(w.organization)}${w.area ? " · " + esc(w.area) : ""}</small></td><td>${Number(w.hours || 0)} hrs</td><td>${Number(w.volunteers || 0)}</td><td>${w.value ? money(w.value) : "—"}</td><td>${w.verified ? '<span class="pill ok">Verified</span>' : `<span class="pill warn">Pending</span>${isMaster() ? ` <button class="btn btn-text" data-act="verifyWork" data-id="${w.id}">Verify</button>` : ""}`}</td>${actionBtns("editWork", "delWork", w.id)}</tr>`);
+      const rows = (data.worklog || []).map((w) => `<tr><td>${esc(w.date)}</td><td><b>${esc(w.activity)}</b><small>${esc(w.organization)}${w.area ? " · " + esc(w.area) : ""}</small></td><td>${Number(w.hours || 0)} hrs</td><td>${Number(w.volunteers || 0)}</td><td>${w.value ? money(w.value) : "—"}</td><td>${w.verified ? '<span class="pill ok">Verified</span>' : `<span class="pill warn">Pending</span>${isMaster() ? ` <button class="btn btn-text" data-act="verifyWork" data-id="${w.id}">Verify</button>` : ""}`}</td>${actionBtns("editWork", "delWork", w.id, `${w.date} ${w.activity}`)}</tr>`);
       P.innerHTML = `<p class="panel-note">Maintenance, cleanups and repairs your group does at the park. This feeds the Stewardship totals on the public page. ${isMaster() ? "As master admin you verify entries." : "Entries show as Pending until the master admin verifies them."}</p>` + table(["Date", "Work", "Hours", "People", "Materials", "Status", ""], rows);
     },
     groups(P, A) {
       if (isMaster()) A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newGroup">+ Add group</button>`;
-      const rows = myGroups().map((g) => `<tr><td><b>${esc(g.name)}</b><small>${esc(g.programType)}</small></td><td>${esc(sportName(g.sport))}</td><td><span class="pill ${g.permitStatus === "permitted" ? "ok" : g.permitStatus === "none" ? "bad" : ""}">${esc(D.config.permitLabels[g.permitStatus] || g.permitStatus || "unknown")}</span></td><td>${g.paidPermit ? "Paid" : "—"}</td><td>${(g.days || []).map((d) => DAYS_S[d]).join(" · ")}</td><td>${esc(g.times || "")}</td>${isMaster() ? actionBtns("editGroup", "delGroup", g.id) : `<td class="actions"><button class="btn btn-text" data-act="editGroup" data-id="${g.id}">Edit</button></td>`}</tr>`);
+      const rows = myGroups().map((g) => `<tr><td><b>${esc(g.name)}</b><small>${esc(g.programType)}</small></td><td>${esc(sportName(g.sport))}</td><td><span class="pill ${g.permitStatus === "permitted" ? "ok" : g.permitStatus === "none" ? "bad" : ""}">${esc(D.config.permitLabels[g.permitStatus] || g.permitStatus || "unknown")}</span></td><td>${g.paidPermit ? "Paid" : "—"}</td><td>${(g.days || []).map((d) => DAYS_S[d]).join(" · ")}</td><td>${esc(g.times || "")}</td>${isMaster() ? actionBtns("editGroup", "delGroup", g.id, g.name) : `<td class="actions"><button class="btn btn-text" data-act="editGroup" data-id="${g.id}" aria-label="Edit ${esc(g.name)}">Edit</button></td>`}</tr>`);
       P.innerHTML = `<p class="panel-note">${isMaster() ? "All listed groups. Permit status and category are master-admin only." : "Your group profile. Contact the master admin to change permit status."}</p>` + table(["Group", "Sport", "Permit", "Fee", "Days", "Times", ""], rows);
     },
     projects(P, A) {
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newProject">+ Add project</button>`;
-      const rows = (data.projects || []).map((p) => `<tr><td><b>${esc(p.title)}</b><small>${esc(p.description).slice(0, 80)}</small></td><td>${esc(p.area || "—")}</td><td><span class="pill ${p.status === "COMPLETED" ? "ok" : "warn"}">${esc(p.status)}</span></td><td>${p.goal ? money(p.raised) + " / " + money(p.goal) : "—"}</td><td>${esc(p.lead || "")}</td>${actionBtns("editProject", "delProject", p.id)}</tr>`);
+      const rows = (data.projects || []).map((p) => `<tr><td><b>${esc(p.title)}</b><small>${esc(p.description).slice(0, 80)}</small></td><td>${esc(p.area || "—")}</td><td><span class="pill ${p.status === "COMPLETED" ? "ok" : "warn"}">${esc(p.status)}</span></td><td>${p.goal ? money(p.raised) + " / " + money(p.goal) : "—"}</td><td>${esc(p.lead || "")}</td>${actionBtns("editProject", "delProject", p.id, p.title)}</tr>`);
       P.innerHTML = `<p class="panel-note">Improvement projects shown on the public page, grouped by area (restrooms, facility updates, fields…).</p>` + table(["Project", "Area", "Status", "Raised / Goal", "Lead", ""], rows);
     },
     submissions(P) {
@@ -197,22 +199,37 @@
       P.innerHTML = `<div class="tiles"><div class="tile"><strong>${st.total || 0}</strong><span>Total</span></div><div class="tile"><strong>${st.confirmed || 0}</strong><span>Confirmed</span></div><div class="tile"><strong>${st.quotaLeft ?? "—"}</strong><span>Emails left today</span></div></div>
         <p class="panel-note">Digests go out automatically each morning to people whose chosen sports have news. Gmail allows about 100 emails a day on a free account.</p><div id="subList"></div>`;
       api("subscribers").then((r) => {
-        $("#subList").innerHTML = table(["Email", "Sports", "Status", "Joined"], r.subscribers.map((s) => `<tr><td>${esc(s.email)}</td><td>${(s.sports || []).join(", ")}</td><td>${s.confirmed ? '<span class="pill ok">Confirmed</span>' : '<span class="pill warn">Unconfirmed</span>'}</td><td>${esc(String(s.createdAt).slice(0, 10))}</td></tr>`));
+        $("#subList").innerHTML = table(["Email", "Sports", "Status", "Joined"], r.subscribers.map((s) => `<tr><td>${esc(s.email)}</td><td>${esc((s.sports || []).join(", "))}</td><td>${s.confirmed ? '<span class="pill ok">Confirmed</span>' : '<span class="pill warn">Unconfirmed</span>'}</td><td>${esc(String(s.createdAt).slice(0, 10))}</td></tr>`));
       }).catch((e) => toast(e.message, true));
     }
   };
 
   /* ---------------- drawer forms ---------------- */
   const drawer = $("#drawer");
-  let onSave = null;
+  const FOCUSABLE = 'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  let onSave = null, drawerLastFocus = null;
+  function trapDrawer(e) {
+    if (e.key !== "Tab") return;
+    const f = $$(FOCUSABLE, $(".drawer-panel", drawer)).filter((el) => !el.disabled && el.offsetParent !== null);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
   function openDrawer(title, fields, save) {
+    drawerLastFocus = document.activeElement;
     $("#drawerTitle").textContent = title;
     $("#drawerForm").innerHTML = fields;
     $("#drawerStatus").textContent = "";
     onSave = save; drawer.hidden = false;
+    document.addEventListener("keydown", trapDrawer);
     const first = $("#drawerForm input, #drawerForm select, #drawerForm textarea"); if (first) first.focus();
   }
-  function closeDrawer() { drawer.hidden = true; onSave = null; }
+  function closeDrawer() {
+    drawer.hidden = true; onSave = null;
+    document.removeEventListener("keydown", trapDrawer);
+    if (drawerLastFocus && drawerLastFocus.isConnected) drawerLastFocus.focus();
+  }
   drawer.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeDrawer(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !drawer.hidden) closeDrawer(); });
   $("#drawerSave").addEventListener("click", async () => {
@@ -221,6 +238,7 @@
       if (el.type === "checkbox") { if (el.dataset.multi) { v[el.name] = v[el.name] || []; if (el.checked) v[el.name].push(el.value); } else v[el.name] = el.checked; }
       else v[el.name] = el.value;
     });
+    if (v.start && v.end && v.start >= v.end) { st.textContent = "End time must be after the start time."; st.classList.add("is-error"); return; }
     st.classList.remove("is-error"); st.textContent = "Saving…";
     try { await onSave(v); closeDrawer(); await refresh(); toast("Saved. The public page will show it shortly."); }
     catch (err) { st.textContent = err.message; st.classList.add("is-error"); }

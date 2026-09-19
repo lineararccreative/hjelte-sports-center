@@ -27,7 +27,7 @@ window.HJELTE = {
     // to POST forms instead of opening the visitor's email client.
     formEndpoint: "",
     // Show small filename tags on empty photo slots (handy while building).
-    showPhotoSlotLabels: true,
+    showPhotoSlotLabels: false,
     // Facility facts (source: City of Los Angeles Recreation and Parks)
     address: "16200 Burbank Blvd., Encino, CA 91436",
     mapsUrl: "https://www.google.com/maps/search/?api=1&query=Hjelte+Sports+Center+16200+Burbank+Blvd+Encino+CA+91436",
@@ -68,11 +68,11 @@ window.HJELTE = {
     { id: "baseball", name: "Baseball", color: "#8C4A3A", icon: "baseball",
       blurb: "Youth baseball shares the four lighted diamonds with softball programs.",
       activities: ["Team practices", "League games", "Youth development", "Weekend tournaments"] },
-    { id: "softball", name: "Softball", color: "#A98A2E", icon: "softball",
+    { id: "softball", name: "Softball", color: "#8A6F1F", icon: "softball",
       blurb: "One of the busiest activities at the complex — slow-pitch, fast-pitch and co-ed leagues.",
       activities: ["Adult leagues", "Co-ed evenings", "Youth fast-pitch", "Tournaments"] },
     { id: "cricket", name: "Cricket", color: "#2E7D4F", icon: "cricket",
-      blurb: "Home to a natural-turf cricket pitch developed by the community ahead of LA28.",
+      blurb: "Home to the Los Angeles Cricket Ground, a natural-turf pitch in Encino developed by the community ahead of LA28.",
       activities: ["Youth coaching", "Net & pitch practice", "Weekend matches", "Community intros"] },
     { id: "soccer", name: "Soccer", color: "#2F6F8F", icon: "soccer",
       blurb: "The shared outfield hosts small-sided games, youth training and informal pickup.",
@@ -83,13 +83,13 @@ window.HJELTE = {
     { id: "fitness", name: "Fitness & Training", color: "#5A6B7A", icon: "fitness",
       blurb: "Bootcamps, running groups and conditioning sessions along the perimeter road and west lawn.",
       activities: ["Morning bootcamps", "Run clubs", "Conditioning", "Walking groups"] },
-    { id: "youth", name: "Youth Recreation", color: "#C27B3A", icon: "youth",
+    { id: "youth", name: "Youth Recreation", color: "#A6591F", icon: "youth",
       blurb: "Programs and camps that introduce kids to sport in a safe, open setting.",
       activities: ["Camps", "After-school programs", "Multi-sport intros", "Family days"] },
     { id: "community", name: "Community Activities", color: "#3D4248", icon: "community",
       blurb: "Cleanup days, gatherings, cultural celebrations and neighborhood events.",
       activities: ["Cleanup days", "Community events", "Celebrations", "Volunteer projects"] },
-    { id: "other", name: "Other Sports", color: "#7A7E83", icon: "other",
+    { id: "other", name: "Other Sports", color: "#63676C", icon: "other",
       blurb: "Kickball, flag football, lacrosse and whatever the community brings next.",
       activities: ["Kickball", "Flag football", "Lacrosse", "Rugby touch"] }
   ],
@@ -146,7 +146,7 @@ window.HJELTE = {
       programType: "Adult co-ed slow-pitch league", ages: "Adult", level: "Recreational",
       days: [1, 2, 4], times: "Mon · Tue · Thu 6:30 – 10:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Weeknight co-ed slow-pitch league using the softball diamonds under lights during the spring and fall seasons."
+      description: "Weeknight co-ed slow-pitch league using the softball diamonds under lights during the spring and fall seasons."
     },
     {
       id: "ex-youth-softball", name: "Encino Youth Fast-Pitch", short: "EY", sport: "softball", example: true,
@@ -154,7 +154,7 @@ window.HJELTE = {
       programType: "Girls fast-pitch, ages 8–14", ages: "Youth", level: "Competitive",
       days: [2, 4, 6], times: "Tue · Thu 4:30 – 6:30 PM · Sat 9:00 AM – 1:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Youth fast-pitch program with weekday practices and Saturday game days on Diamonds A–B."
+      description: "Youth fast-pitch program with weekday practices and Saturday game days on Diamonds A–B."
     },
     {
       id: "ex-baseball-club", name: "Sepulveda Basin Baseball Club", short: "SB", sport: "baseball", example: true,
@@ -162,7 +162,7 @@ window.HJELTE = {
       programType: "Youth travel baseball, 10U–14U", ages: "Youth", level: "Competitive",
       days: [1, 3, 0], times: "Mon · Wed 5:00 – 7:30 PM · Sun 10:00 AM – 3:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Youth baseball program using Diamond B for weekday practices and Sunday games."
+      description: "Youth baseball program using Diamond B for weekday practices and Sunday games."
     },
     {
       id: "ex-youth-soccer", name: "Basin Youth Soccer Academy", short: "BY", sport: "soccer", example: true,
@@ -170,7 +170,7 @@ window.HJELTE = {
       programType: "Recreational youth soccer, ages 5–12", ages: "Youth", level: "Recreational",
       days: [2, 4, 6], times: "Tue · Thu 4:00 – 6:00 PM · Sat 8:00 AM – 12:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Small-sided youth soccer on the shared outfield with Saturday morning game days."
+      description: "Small-sided youth soccer on the shared outfield with Saturday morning game days."
     },
     {
       id: "ex-ultimate", name: "Valley Ultimate Pickup", short: "VU", sport: "disc", example: true,
@@ -178,7 +178,7 @@ window.HJELTE = {
       programType: "Ultimate frisbee pickup — all welcome", ages: "Adult", level: "Recreational",
       days: [3, 0], times: "Wed 6:30 – 8:30 PM · Sun 10:00 AM – 12:30 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Recurring drop-in ultimate on the shared outfield. Bring a light and a dark shirt; newcomers welcome."
+      description: "Recurring drop-in ultimate on the shared outfield. Bring a light and a dark shirt; newcomers welcome."
     },
     {
       id: "ex-bootcamp", name: "Sunrise Bootcamp Encino", short: "SB", sport: "fitness", example: true,
@@ -186,7 +186,7 @@ window.HJELTE = {
       programType: "Outdoor group fitness", ages: "Adult", level: "Recreational",
       days: [1, 3, 5], times: "Mon · Wed · Fri 6:00 – 7:00 AM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Early-morning conditioning sessions along the perimeter road and the west lawn."
+      description: "Early-morning conditioning sessions along the perimeter road and the west lawn."
     },
     {
       id: "ex-weekend-cricket", name: "Weekend Social Cricket", short: "WC", sport: "cricket", example: true,
@@ -194,7 +194,7 @@ window.HJELTE = {
       programType: "Tape-ball social cricket", ages: "Mixed", level: "Recreational",
       days: [6], times: "Sat 3:00 – 6:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Informal weekend tape-ball games on the west lawn. Families and first-timers encouraged."
+      description: "Informal weekend tape-ball games on the west lawn. Families and first-timers encouraged."
     },
     {
       id: "ex-pickup-soccer", name: "Sunday Pickup Soccer", short: "PS", sport: "soccer", example: true,
@@ -202,7 +202,7 @@ window.HJELTE = {
       programType: "Adult pickup soccer", ages: "Adult", level: "Recreational",
       days: [0], times: "Sun 4:00 – 6:30 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Long-running Sunday afternoon pickup game on the shared outfield."
+      description: "Long-running Sunday afternoon pickup game on the shared outfield."
     },
     {
       id: "ex-walk-club", name: "Basin Walk & Talk Club", short: "WT", sport: "fitness", example: true,
@@ -210,7 +210,7 @@ window.HJELTE = {
       programType: "Neighborhood walking group", ages: "Mixed", level: "Recreational",
       days: [2, 4], times: "Tue · Thu 8:00 – 9:00 AM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Friendly loop walks on the perimeter path, open to all ages and paces."
+      description: "Friendly loop walks on the perimeter path, open to all ages and paces."
     },
     {
       id: "ex-kickball", name: "Encino Kickball Social", short: "KB", sport: "other", example: true,
@@ -218,7 +218,7 @@ window.HJELTE = {
       programType: "Adult social kickball", ages: "Adult", level: "Recreational",
       days: [5], times: "Fri 6:00 – 8:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Sample listing. Casual Friday-evening kickball on Diamond D when available."
+      description: "Casual Friday-evening kickball on Diamond D when available."
     }
   ],
 
@@ -272,8 +272,8 @@ window.HJELTE = {
       note: "Try cricket for the first time — bats, balls and coaches provided." },
     { date: "2026-09-26", start: "08:00", end: "11:00", title: "Fall Field Cleanup Day", sport: "community", groupId: null, facility: "westLawn", type: "Community Activity", category: "community",
       note: "Gloves and bags provided. Meet at the Burbank Blvd entrance." },
-    { date: "2026-10-03", start: "08:00", end: "17:00", title: "Softball Fall Classic", sport: "softball", groupId: "ex-softball-league", facility: "sbA", type: "Tournament", category: "permitted",
-      note: "Sample event. Diamonds A–D reserved all day." },
+    { date: "2026-10-03", start: "08:00", end: "17:00", title: "Softball Fall Classic", sport: "softball", groupId: "ex-softball-league", facility: "sbA", type: "Tournament", category: "permitted", example: true,
+      note: "Diamonds A–D reserved all day." },
     { date: "2026-10-10", start: "09:00", end: "14:00", title: "Youth Multi-Sport Family Day", sport: "youth", groupId: null, facility: "outfield", type: "Special Event", category: "community",
       note: "Rotating stations: soccer, cricket, softball and disc." },
     { date: "2026-10-17", start: "07:00", end: "12:00", title: "Irrigation Upgrade — Shared Outfield (south half)", sport: "community", groupId: null, facility: "outfield", type: "Maintenance", category: "maintenance",

@@ -133,6 +133,23 @@ function withLock(fn) {
   try { return fn(); } finally { lock.releaseLock(); }
 }
 
+/* ------------------------------------------------------- validation utils */
+const EMAIL_RE = /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/;
+function validEmail(e) { return EMAIL_RE.test(String(e || "").trim()); }
+function cleanUrl(u) { const v = String(u || "").trim(); return /^https?:\/\//i.test(v) ? v.slice(0, 300) : ""; }
+function oneLine(s, max) { return String(s || "").replace(/[\r\n]+/g, " ").slice(0, max || 200); }
+// Small fixed-window throttle. Apps Script gives us no client IP, so the key is
+// the action plus the target address; a global counter caps total abuse volume.
+function throttle(key, limit, windowSec) {
+  const cache = CacheService.getScriptCache();
+  const k = "t:" + key;
+  const n = Number(cache.get(k) || 0) + 1;
+  cache.put(k, String(n), windowSec);
+  if (n > limit) throw new Error("Too many requests. Please try again later.");
+  return n;
+}
+function throttleGlobal(action, limit) { throttle("g:" + action + ":" + Math.floor(Date.now() / 3600000), limit, 3600); }
+
 /* ------------------------------------------------------------- responses */
 function json(obj) {
   return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
@@ -162,8 +179,17 @@ function doGet(e) {
 }
 function publicData() {
   const groups = rows("Groups").filter((g) => g.status === "approved");
-  const updates = rows("Updates").sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 40);
-  const worklog = rows("WorkLog").sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 200);
+  const admins = rows("Admins");
+  const displayName = (email) => {
+    const a = admins.find((x) => String(x.email).toLowerCase() === String(email).toLowerCase());
+    return a && a.name ? a.name : "Hub maintainers";
+  };
+  // Admin email addresses never leave the sheet: author falls back to a name,
+  // and the work log's addedBy column is dropped entirely.
+  const updates = rows("Updates").sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 40)
+    .map((u) => { if (EMAIL_RE.test(u.author)) u.author = displayName(u.author); return u; });
+  const worklog = rows("WorkLog").sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 200)
+    .map((w) => { delete w.addedBy; return w; });
   return {
     ok: true,
     lastUpdated: meta("lastUpdated"),
@@ -183,10 +209,10 @@ function doPost(e) {
   const action = body.action;
   try {
     // public actions
-    if (action === "subscribe") return json(subscribe(body));
-    if (action === "submitGroup") return json(submitGroup(body.data || {}));
-    if (action === "requestCode") return json(requestCode(body.email));
-    if (action === "verifyCode") return json(verifyCode(body.email, body.code));
+    if (action === "subscribe") return json(withLock(() => subscribe(body)));
+    if (action === "submitGroup") return json(withLock(() => submitGroup(body.data || {})));
+    if (action === "requestCode") return json(withLock(() => requestCode(body.email)));
+    if (action === "verifyCode") return json(withLock(() => verifyCode(body.email, body.code)));
     // admin actions
     const admin = auth(body.token);
     const d = body.data || {};
@@ -226,10 +252,20 @@ function requestCode(email) {
   const admin = rows("Admins").find((a) => String(a.email).toLowerCase() === email);
   // Always answer the same way so the endpoint doesn't reveal who is an admin.
   if (!admin) return { ok: true, message: "If that address is an admin, a sign-in code is on its way." };
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  // One code per address per 2 minutes, 6 per hour, and a global hourly cap.
+  throttle("code:" + email, 1, 120);
+  throttle("codeh:" + email, 6, 3600);
+  throttleGlobal("requestCode", 60);
+  // Utilities.getUuid() is a random v4 UUID; mixing its digits with Math.random
+  // gives a better-distributed code than Math.random alone.
+  const entropy = Utilities.getUuid().replace(/\D/g, "") + String(Math.floor(Math.random() * 1e6));
+  const code = String(100000 + (Number(entropy.slice(0, 12)) % 900000));
   const expires = new Date(Date.now() + CODE_TTL_MIN * 60000).toISOString();
   const existing = rows("Auth").find((a) => a.email === email) || { email };
-  upsertRow("Auth", "email", Object.assign(existing, { code, codeExpires: expires, attempts: 0 }));
+  // attempts deliberately NOT reset here: requesting a fresh code must not
+  // clear the brute-force lockout for the window.
+  const attempts = Number(existing.attempts || 0);
+  upsertRow("Auth", "email", Object.assign(existing, { code, codeExpires: expires, attempts: attempts >= MAX_CODE_ATTEMPTS ? attempts : 0 }));
   MailApp.sendEmail({
     to: email,
     subject: `${code} is your ${SITE_NAME} sign-in code`,
@@ -241,6 +277,7 @@ function requestCode(email) {
 }
 function verifyCode(email, code) {
   email = String(email || "").trim().toLowerCase();
+  throttle("verify:" + email, 12, 600);
   const rec = rows("Auth").find((a) => a.email === email);
   if (!rec || !rec.code) throw new Error("Request a new code first.");
   if (new Date(rec.codeExpires) < new Date()) throw new Error("That code has expired. Request a new one.");
@@ -295,15 +332,27 @@ function adminData(admin) {
   return out;
 }
 const MASTER_ONLY_GROUP_FIELDS = ["category", "permitStatus", "paidPermit", "badges", "status", "example", "id"];
+// Free-text fields are rendered into links and attributes on the public page,
+// so URLs and emails are normalised before they are ever stored.
+function sanitizeGroup(d) {
+  const o = Object.assign({}, d);
+  if (o.website !== undefined) o.website = cleanUrl(o.website);
+  if (o.social !== undefined) o.social = cleanUrl(o.social);
+  if (o.email !== undefined) o.email = validEmail(o.email) ? String(o.email).trim() : "";
+  ["name", "short", "programType", "times", "socialHandle"].forEach((k) => { if (o[k] !== undefined) o[k] = oneLine(o[k], 160); });
+  ["description", "description_es"].forEach((k) => { if (o[k] !== undefined) o[k] = String(o[k]).slice(0, 1200); });
+  return o;
+}
 function saveGroup(admin, d) {
   const existing = rows("Groups").find((g) => g.id === d.id);
   if (!existing) {
     requireMaster(admin);
-    const g = Object.assign({ id: d.id || slug(d.name) || uid(), status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { updatedAt: nowISO() });
+    d = sanitizeGroup(d);
+    const g = Object.assign({ status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: d.id || slug(d.name) || uid(), updatedAt: nowISO() });
     upsertRow("Groups", "id", g); touch(); return { ok: true, group: g };
   }
   requireGroup(admin, existing.id);
-  const patch = Object.assign({}, d);
+  const patch = sanitizeGroup(d);
   if (!isMaster(admin)) MASTER_ONLY_GROUP_FIELDS.forEach((k) => delete patch[k]);
   const g = Object.assign(existing, patch, { id: existing.id, updatedAt: nowISO() });
   upsertRow("Groups", "id", g); touch(); return { ok: true, group: g };
@@ -314,7 +363,8 @@ function saveScheduleLike(sheetName, admin, d) {
   if (!d.groupId && !isMaster(admin)) throw new Error("Choose one of your groups");
   requireGroup(admin, d.groupId);
   const g = d.groupId ? rows("Groups").find((x) => x.id === d.groupId) : null;
-  const rec = Object.assign({ id: uid() }, existing || {}, d, {
+  const rec = Object.assign({}, existing || {}, d, {
+    id: (existing && existing.id) || d.id || uid(),
     sport: d.sport || (g ? g.sport : "community"),
     category: isMaster(admin) ? (d.category || (g ? (g.permitStatus === "permitted" ? "permitted" : "community") : "maintenance")) : (g.permitStatus === "permitted" ? "permitted" : "community"),
     updatedBy: admin.email, updatedAt: nowISO()
@@ -340,6 +390,11 @@ function postUpdate(admin, d) {
     const g = rows("Groups").find((x) => x.id === groupId); sport = g ? g.sport : sport;
   }
   const prev = d.id ? rows("Updates").find((x) => x.id === d.id) : null;
+  // Editing an existing update requires rights over the record as it stands,
+  // not just over the group the caller is submitting.
+  if (prev && !isMaster(admin) && !canEditGroup(admin, prev.groupId) && prev.author !== admin.email) {
+    throw new Error("You can only edit your own group's updates");
+  }
   const u = { id: d.id || uid(), createdAt: prev ? prev.createdAt : nowISO(), author: d.author || admin.name || admin.email, sport, groupId, title: d.title, body: d.body || "", title_es: d.title_es || "", body_es: d.body_es || "", sentAt: prev ? prev.sentAt : "" };
   upsertRow("Updates", "id", u); touch(); return { ok: true, update: u };
 }
@@ -356,7 +411,9 @@ function addWorkLog(admin, d) {
     requireGroup(admin, groupId);
     const g = rows("Groups").find((x) => x.id === groupId); organization = g ? g.name : organization;
   }
-  const w = Object.assign({ id: uid(), verified: isMaster(admin) }, d, { groupId, organization, addedBy: admin.email, createdAt: nowISO() });
+  const prevW = d.id ? rows("WorkLog").find((x) => x.id === d.id) : null;
+  if (prevW && !isMaster(admin) && !canEditGroup(admin, prevW.groupId)) throw new Error("Not your entry");
+  const w = Object.assign({ verified: isMaster(admin) }, prevW || {}, d, { id: (prevW && prevW.id) || d.id || uid(), groupId, organization, addedBy: admin.email, createdAt: nowISO() });
   if (!w.date || !w.activity) throw new Error("Date and activity are required");
   upsertRow("WorkLog", "id", w); touch(); return { ok: true, entry: w };
 }
@@ -370,8 +427,8 @@ function addAdmin(admin, d) {
   requireMaster(admin);
   const email = String(d.email || "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Valid email required");
-  const rec = { email, role: d.role === "master" ? "master" : "community", groupIds: d.groupIds || [], name: d.name || "", addedBy: admin.email, addedAt: nowISO() };
-  if (email === MASTER_EMAIL) rec.role = "master";
+  // The master role is bound to MASTER_EMAIL; nobody else can be granted it.
+  const rec = { email, role: email === MASTER_EMAIL ? "master" : "community", groupIds: d.groupIds || [], name: oneLine(d.name, 80), addedBy: admin.email, addedAt: nowISO() };
   upsertRow("Admins", "email", rec);
   if (d.notify !== false) {
     MailApp.sendEmail({ to: email, subject: `You're an admin on the ${SITE_NAME}`,
@@ -390,7 +447,7 @@ function approveSubmission(admin, d) {
     id: d.groupId || slug(s.groupName) || uid(), name: s.groupName, short: initials(s.groupName), sport: sportId,
     category: permitted ? "permitted" : "community", permitStatus: permitted ? "permitted" : (String(s.permit).toLowerCase() === "no" ? "none" : "unknown"), paidPermit: permitted,
     badges: permitted ? ["PERMITTED ORGANIZATION"] : ["COMMUNITY GROUP"], programType: s.orgType, ages: s.ages || "Mixed", level: "Recreational",
-    days: parseDays(s.days), times: s.times, website: s.website, social: s.social, socialHandle: "", email: s.email,
+    days: parseDays(s.days), times: oneLine(s.times, 160), website: cleanUrl(s.website), social: cleanUrl(s.social), socialHandle: "", email: validEmail(s.email) ? s.email : "",
     description: s.description, description_es: "", logoUrl: "", status: "approved", example: false, updatedAt: nowISO()
   };
   upsertRow("Groups", "id", g);
@@ -401,11 +458,14 @@ function approveSubmission(admin, d) {
 
 /* ---------------------------------------------------- public: submissions */
 function submitGroup(f) {
-  if (!f.groupName || !f.email) throw new Error("Group name and email are required");
+  if (!f.groupName || !validEmail(f.email)) throw new Error("Group name and a valid email are required");
+  throttle("sg:" + String(f.email).toLowerCase(), 3, 3600);
+  throttleGlobal("submitGroup", 40);
   const s = Object.assign({ id: uid(), createdAt: nowISO(), status: "pending" }, f);
-  Object.keys(s).forEach((k) => { if (SCHEMA.Submissions.indexOf(k) === -1) delete s[k]; });
+  Object.keys(s).forEach((k) => { if (SCHEMA.Submissions.indexOf(k) === -1) delete s[k]; else if (typeof s[k] === "string") s[k] = s[k].slice(0, 1200); });
+  s.website = cleanUrl(s.website); s.groupName = oneLine(s.groupName, 120);
   appendRow("Submissions", s);
-  MailApp.sendEmail({ to: MASTER_EMAIL, subject: `[Hjelte Hub] New group submission: ${f.groupName}`,
+  MailApp.sendEmail({ to: MASTER_EMAIL, subject: `[Hjelte Hub] New group submission: ${oneLine(f.groupName, 80)}`,
     htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">A new group asked to be listed. Review it in the admin center → Submissions.</p><pre>${escapeHtml(JSON.stringify(s, null, 2))}</pre>` });
   return { ok: true };
 }
@@ -414,7 +474,12 @@ function submitGroup(f) {
 function subscribe(b) {
   const email = String(b.email || "").trim().toLowerCase();
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Valid email required");
-  let sports = Array.isArray(b.sports) ? b.sports.filter(Boolean) : [];
+  throttle("sub:" + email, 3, 3600);
+  throttleGlobal("subscribe", 80);
+  // Only ids the site actually offers are stored — this value is echoed back
+  // into the admin UI and into emails.
+  const ALLOWED = ["all", "baseball", "softball", "cricket", "soccer", "disc", "fitness", "youth", "community", "other"];
+  let sports = (Array.isArray(b.sports) ? b.sports : []).map((x) => String(x).trim().toLowerCase()).filter((x) => ALLOWED.indexOf(x) !== -1);
   if (!sports.length || sports.indexOf("all") !== -1) sports = ["all"];
   const existing = rows("Subscribers").find((s) => s.email === email);
   const rec = Object.assign({ email, createdAt: nowISO(), confirmed: false, token: Utilities.getUuid() }, existing || {}, { sports });
@@ -467,7 +532,7 @@ function sendDailyDigest(force) {
       <p style="margin-top:20px"><a href="${SITE_URL}#schedule" style="background:#1C1F22;color:#fff;padding:10px 16px;border-radius:999px;text-decoration:none;font-weight:600">See the full schedule</a></p>
       <p style="color:#8A8F95;font-size:12px;margin-top:24px">Schedules are a community information resource and may change. Official permits and City of Los Angeles Department of Recreation and Parks requirements govern facility use.<br>
       <a href="${base}?action=unsubscribe&token=${s.token}" style="color:#8A8F95">Unsubscribe</a></p></div>`;
-    MailApp.sendEmail({ to: s.email, subject: `Hjelte update · ${myUpdates[0] ? myUpdates[0].title : myEvents[0].title}`, htmlBody: html });
+    MailApp.sendEmail({ to: s.email, subject: oneLine(`Hjelte update · ${myUpdates[0] ? myUpdates[0].title : myEvents[0].title}`, 120), htmlBody: html });
     s.lastSentAt = nowISO(); upsertRow("Subscribers", "email", s); sent++;
   }
   updates.forEach((u) => { if (!u.sentAt) { u.sentAt = nowISO(); upsertRow("Updates", "id", u); } });

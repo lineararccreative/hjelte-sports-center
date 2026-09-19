@@ -15,14 +15,20 @@
   const I18 = window.I18N || { lang: "en", locale: "en-US", days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"], daysShort: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"], t: (x) => x, apply() {}, init() {} };
   let DAYS = I18.days, DAYS_S = I18.daysShort;
   const tr = (obj, key) => (I18.lang === "es" && obj && obj[key + "_es"]) ? obj[key + "_es"] : (obj ? obj[key] : "");
-  const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
-  const fmtTime = (t) => { let [h, m] = t.split(":").map(Number); const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return m ? `${h}:${String(m).padStart(2, "0")} ${ap}` : `${h} ${ap}`; };
+  const toMin = (t) => { if (!t) return NaN; const [h, m] = String(t).split(":").map(Number); return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : NaN; };
+  const fmtTime = (t) => { if (!t) return "—"; let [h, m] = String(t).split(":").map(Number); if (!Number.isFinite(h)) return "—"; const ap = h >= 12 ? "PM" : "AM"; h = h % 12 || 12; return m ? `${h}:${String(m).padStart(2, "0")} ${ap}` : `${h} ${ap}`; };
+  const reduceMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const scrollBehavior = () => (reduceMotion() ? "auto" : "smooth");
+  // Only http(s) links are rendered; anything else (javascript:, data:) is dropped.
+  const safeUrl = (u) => { const v = String(u || "").trim(); return /^https?:\/\//i.test(v) ? v : ""; };
+  const safeMail = (e) => { const v = String(e || "").trim(); return /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/.test(v) ? v : ""; };
   const fmtRange = (a, b) => `${fmtTime(a)} – ${fmtTime(b)}`;
   const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const parseISO = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
   const fmtDate = (d, opts = { weekday: "long", month: "long", day: "numeric" }) => d.toLocaleDateString(I18.locale, opts);
   const money = (n) => "$" + Number(n).toLocaleString("en-US");
-  const sport = (id) => D.sports.find((s) => s.id === id) || D.sports[D.sports.length - 1];
+  const UNKNOWN_SPORT = { id: "unknown", name: "Other", color: "#63676C", icon: "other", activities: [], blurb: "" };
+  const sport = (id) => D.sports.find((s) => s.id === id) || (id && console.warn("Unknown sport id:", id), D.sports.find((s) => s.id === id) || UNKNOWN_SPORT);
   const group = (id) => D.groups.find((g) => g.id === id) || null;
   const facility = (id) => D.facilities.find((f) => f.id === id) || null;
   const slug = (s) => String(s).toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -103,6 +109,7 @@
     if (src) {
       const img = document.createElement("img");
       img.className = "photo"; img.src = src; img.alt = container.dataset.alt || "";
+      if (container.id !== "heroMedia") { img.loading = "lazy"; img.decoding = "async"; }
       container.appendChild(img);
       container.classList.add("has-photo");
     } else if (D.config.showPhotoSlotLabels && container.dataset.label) {
@@ -126,7 +133,7 @@
     header.classList.toggle("menu-open", open);
   });
   $$("a", nav).forEach((a) => a.addEventListener("click", () => { nav.classList.remove("is-open"); toggle.setAttribute("aria-expanded", "false"); header.classList.remove("menu-open"); }));
-  $("#toTop").addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+  $("#toTop").addEventListener("click", () => window.scrollTo({ top: 0, behavior: scrollBehavior() }));
 
   // scroll spy
   const navLinks = $$("#siteNav ul a");
@@ -167,13 +174,30 @@
 
   /* ---------------- modal ---------------- */
   const modal = $("#modal"), modalBody = $("#modalBody");
+  const FOCUSABLE = 'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+  const BG_REGIONS = ["main#top", ".site-header", ".site-footer"];
   let lastFocus = null;
+  function trapFocus(e) {
+    if (e.key !== "Tab") return;
+    const f = $$(FOCUSABLE, $(".modal-panel", modal)).filter((el) => el.offsetParent !== null || el === document.activeElement);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
   function openModal(html) {
     lastFocus = document.activeElement;
     modalBody.innerHTML = html; modal.hidden = false; document.body.style.overflow = "hidden";
+    BG_REGIONS.forEach((sel) => { const el = $(sel); if (el) el.setAttribute("aria-hidden", "true"); });
+    document.addEventListener("keydown", trapFocus);
     $(".modal-close", modal).focus();
   }
-  function closeModal() { modal.hidden = true; document.body.style.overflow = ""; if (lastFocus) lastFocus.focus(); }
+  function closeModal() {
+    modal.hidden = true; document.body.style.overflow = "";
+    BG_REGIONS.forEach((sel) => { const el = $(sel); if (el) el.removeAttribute("aria-hidden"); });
+    document.removeEventListener("keydown", trapFocus);
+    if (lastFocus) lastFocus.focus();
+  }
   modal.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeModal(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !modal.hidden) closeModal(); });
 
@@ -183,7 +207,7 @@
       const n = D.groups.filter((g) => g.sport === s.id).length;
       return `<button class="sport-card reveal" style="${sportStyle(s.id)}" data-sport="${s.id}" aria-haspopup="dialog">
         <span class="sport-bar"></span>
-        <div class="sport-visual" data-image="sports" data-sub="${s.id}" data-label="sport-${s.id}.jpg"><span class="ic">${icon(s.icon)}</span></div>
+        <div class="sport-visual" data-image="sports" data-sub="${s.id}" data-label="sport-${s.id}.jpg" data-alt="${esc(s.name)} at Hjelte Sports Center"><span class="ic">${icon(s.icon)}</span></div>
         <div class="sport-body">
           <h3>${esc(s.name)}</h3>
           <p>${esc(s.blurb)}</p>
@@ -222,7 +246,7 @@
 
   function occurrencesOn(date) {
     const dow = date.getDay(), iso = isoDate(date);
-    const rec = D.schedule.filter((e) => e.day === dow).map((e) => ({ ...e, date: iso }));
+    const rec = D.schedule.filter((e) => Number(e.day) === dow).map((e) => ({ ...e, date: iso }));
     const sp = D.specialEvents.filter((e) => e.date === iso).map((e) => ({ ...e, day: dow, special: true }));
     return [...rec, ...sp].sort((a, b) => toMin(a.start) - toMin(b.start));
   }
@@ -238,7 +262,7 @@
         <div class="activity-meta">
           <span class="tag tag-sport">${esc(s.name)}</span>
           <span class="tag">${esc(e.type)}</span>
-          <span class="tag tag-cat ${e.category}">${esc(D.categories[e.category]?.label || e.category)}</span>
+          ${(D.categories[e.category]?.label || e.category) === e.type ? "" : `<span class="tag tag-cat ${e.category}">${esc(D.categories[e.category]?.label || e.category)}</span>`}
         </div>
         <div class="activity-meta">
           ${g && e.title ? `<span>${icon("users")}${esc(g.name)}</span>` : ""}
@@ -269,10 +293,25 @@
     }
   }
   let currentRange = "today";
-  $$(".tabs .tab").forEach((t) => t.addEventListener("click", () => {
-    $$(".tabs .tab").forEach((x) => { x.classList.toggle("is-active", x === t); x.setAttribute("aria-selected", String(x === t)); });
+  const TABS = $$(".tabs .tab");
+  function selectTab(t) {
+    TABS.forEach((x) => {
+      const on = x === t;
+      x.classList.toggle("is-active", on); x.setAttribute("aria-selected", String(on)); x.tabIndex = on ? 0 : -1;
+    });
+    $("#activityList").setAttribute("aria-labelledby", t.id);
     currentRange = t.dataset.range; renderHappening(currentRange);
-  }));
+  }
+  TABS.forEach((t, i) => {
+    t.addEventListener("click", () => selectTab(t));
+    t.addEventListener("keydown", (e) => {
+      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : e.key === "Home" ? -i : e.key === "End" ? TABS.length - 1 - i : 0;
+      if (!d) return;
+      e.preventDefault();
+      const next = TABS[(i + d + TABS.length) % TABS.length];
+      next.focus(); selectTab(next);
+    });
+  });
 
   // Weekly master schedule
   const sched = { sport: "", day: "", facility: "", type: "", group: "", category: "" };
@@ -282,7 +321,13 @@
   fillSelect(filtersForm.day, DAYS.map((d, i) => [String(i), d]));
   fillSelect(filtersForm.facility, D.facilities.map((f) => [f.id, f.name]));
   fillSelect(filtersForm.type, D.activityTypes.map((t) => [t, t]));
-  fillSelect(filtersForm.group, D.groups.map((g) => [g.id, g.name + (g.example ? " (sample)" : "")]));
+  function fillGroupFilter() {
+    const keep = filtersForm.group.value;
+    filtersForm.group.innerHTML = `<option value="">All organizations</option>`;
+    fillSelect(filtersForm.group, D.groups.map((g) => [g.id, g.name + (g.example ? " (sample)" : "")]));
+    if (D.groups.some((g) => g.id === keep)) filtersForm.group.value = keep; else sched.group = "";
+  }
+  fillGroupFilter();
   fillSelect(filtersForm.category, Object.entries(D.categories).map(([k, v]) => [k, v.label]));
   filtersForm.addEventListener("change", () => { Object.keys(sched).forEach((k) => sched[k] = filtersForm[k].value); renderSchedule(); });
   filtersForm.addEventListener("reset", () => setTimeout(() => { Object.keys(sched).forEach((k) => sched[k] = ""); renderSchedule(); }, 0));
@@ -291,7 +336,7 @@
   function filteredSchedule() {
     return D.schedule.filter((e) =>
       (!sched.sport || e.sport === sched.sport) &&
-      (!sched.day || String(e.day) === sched.day) &&
+      (!sched.day || String(Number(e.day)) === sched.day) &&
       (!sched.facility || e.facility === sched.facility) &&
       (!sched.type || e.type === sched.type) &&
       (!sched.group || e.groupId === sched.group) &&
@@ -321,14 +366,17 @@
     const days = sched.day ? [Number(sched.day)] : [0, 1, 2, 3, 4, 5, 6];
     const grid = $("#weekGrid"), list = $("#weekList");
     $("#scheduleEmpty").hidden = items.length > 0;
+    grid.hidden = list.hidden = items.length === 0;
     grid.style.gridTemplateColumns = `56px repeat(${days.length}, 1fr)`;
     const bodyH = (END - START) / 60 * HOUR_H;
     let html = `<div class="wg-head"></div>` + days.map((d) => `<div class="wg-head${d === today.getDay() ? " is-today" : ""}">${DAYS_S[d]}${d === today.getDay() ? "<em>Today</em>" : ""}</div>`).join("");
     html += `<div class="wg-gutter" style="height:${bodyH}px">` + Array.from({ length: (END - START) / 60 + 1 }, (_, i) => `<span style="top:${i * HOUR_H}px">${fmtTime(`${String(6 + i).padStart(2, "0")}:00`)}</span>`).join("") + `</div>`;
     html += days.map((d) => {
-      const evs = lanes(items.filter((e) => e.day === d));
+      const evs = lanes(items.filter((e) => Number(e.day) === d));
       return `<div class="wg-col${d === today.getDay() ? " is-today" : ""}" style="height:${bodyH}px;--hour-h:${HOUR_H}px">` + evs.map(({ e, lane, n }) => {
-        const top = (toMin(e.start) - START) / 60 * HOUR_H, h = (toMin(e.end) - toMin(e.start)) / 60 * HOUR_H;
+        const sMin = Math.max(START, Math.min(END, toMin(e.start) || START));
+        const eMin = Math.max(sMin + 15, Math.min(END, toMin(e.end) || END));
+        const top = (sMin - START) / 60 * HOUR_H, h = Math.max(18, (eMin - sMin) / 60 * HOUR_H);
         const w = 100 / n, f = facility(e.facility);
         return `<button class="wg-event ${e.category}" style="${sportStyle(e.sport)};top:${top + 1}px;height:${h - 3}px;left:calc(${lane * w}% + 3px);width:calc(${w}% - 6px)" data-idx="${D.schedule.indexOf(e)}" title="${esc(titleOf(e))} · ${fmtRange(e.start, e.end)}">
           <b>${esc(titleOf(e))}</b><span>${fmtRange(e.start, e.end)}</span><span>${esc(f ? f.name : "")}</span></button>`;
@@ -338,7 +386,7 @@
     $$(".wg-event", grid).forEach((b) => b.addEventListener("click", () => openEvent(D.schedule[Number(b.dataset.idx)])));
 
     list.innerHTML = days.map((d) => {
-      const evs = items.filter((e) => e.day === d).sort((a, b) => toMin(a.start) - toMin(b.start));
+      const evs = items.filter((e) => Number(e.day) === d).sort((a, b) => toMin(a.start) - toMin(b.start));
       if (!evs.length) return "";
       return `<details class="wl-day${d === today.getDay() ? " is-today" : ""}" ${d === today.getDay() || sched.day ? "open" : ""}>
         <summary>${DAYS[d]}<small>${evs.length} ${evs.length === 1 ? "activity" : "activities"}</small></summary>
@@ -383,7 +431,7 @@
   });
   function setGroupFilter(key, val) {
     const row = $(`#groupFilters [data-filter="${key}"]`);
-    $$(".chip", row).forEach((c) => c.classList.toggle("is-active", c.dataset.value === val));
+    $$(".chip", row).forEach((c) => { const on = c.dataset.value === val; c.classList.toggle("is-active", on); c.setAttribute("aria-pressed", String(on)); });
     dir[key] = val; renderGroups();
   }
   $("#groupSearch").addEventListener("input", (e) => { dir.q = e.target.value.trim().toLowerCase(); renderGroups(); });
@@ -398,12 +446,14 @@
   }
   function groupCard(g) {
     const s = sport(g.sport);
-    const contactHref = g.email ? `mailto:${g.email}?subject=${encodeURIComponent("Hello from the Hjelte community hub")}` : mailto(`Contact request: ${g.name}`, `I'd like to get in touch with ${g.name} (listed on the Hjelte Sports Center hub).\n\nMy message:\n`);
+    const mail = safeMail(g.email);
+    const contactHref = mail ? `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent("Hello from the Hjelte community hub")}` : mailto(`Contact request: ${g.name}`, `I'd like to get in touch with ${g.name} (listed on the Hjelte Sports Center hub).\n\nMy message:\n`);
+    const site = safeUrl(g.website), social = safeUrl(g.social);
     return `<article class="group-card" style="${sportStyle(g.sport)}" data-id="${g.id}">
       ${g.example ? '<span class="tag tag-example sample-tag" title="Placeholder listing to be replaced with a real group">Sample</span>' : ""}
       <div class="group-top">
         <div class="logo-tile">${g.logo ? `<img src="${esc(g.logo)}" alt="">` : esc(g.short)}</div>
-        <div><div class="group-name">${esc(g.name)}</div><div class="group-sport">${icon(s.icon)} ${esc(s.name)}</div></div>
+        <div><h3 class="group-name">${esc(g.name)}</h3><div class="group-sport">${icon(s.icon)} ${esc(s.name)}</div></div>
       </div>
       <div class="badges">${g.badges.map((b) => `<span class="badge ${badgeClass(b)}">${esc(b)}</span>`).join("")}${permitBadge(g)}</div>
       <p class="group-desc">${esc(tr(g, "description"))}</p>
@@ -415,8 +465,8 @@
       </div>
       <div class="group-links">
         <a class="btn btn-dark" href="${contactHref}">${icon("mail")} Contact</a>
-        ${g.website ? `<a class="link-icon" href="${esc(g.website)}" target="_blank" rel="noopener">${icon("globe")} Website</a>` : ""}
-        ${g.social ? `<a class="link-icon" href="${esc(g.social)}" target="_blank" rel="noopener">${icon("instagram")} ${esc(g.socialHandle || "Social")}</a>` : ""}
+        ${site ? `<a class="link-icon" href="${esc(site)}" target="_blank" rel="noopener">${icon("globe")} Website</a>` : ""}
+        ${social ? `<a class="link-icon" href="${esc(social)}" target="_blank" rel="noopener">${icon("instagram")} ${esc(g.socialHandle || "Social")}</a>` : ""}
       </div></article>`;
   }
   function permitBadge(g) {
@@ -427,15 +477,15 @@
   function renderRoster() {
     const order = { permitted: 0, unknown: 1, none: 2 };
     const list = [...D.groups].sort((a, b) => (order[a.permitStatus] ?? 1) - (order[b.permitStatus] ?? 1) || a.name.localeCompare(b.name));
-    $("#rosterTable").innerHTML = `<thead><tr><th>Group</th><th>Sport</th><th>Program</th><th>Permit status</th><th>Paid</th><th>Days</th><th>Contact</th></tr></thead><tbody>` +
+    $("#rosterTable").innerHTML = `<caption class="sr-only">Every group that participates at Hjelte Sports Center, with sport, program, permit status and typical days</caption><thead><tr><th scope="col">Group</th><th scope="col">Sport</th><th scope="col">Program</th><th scope="col">Permit status</th><th scope="col">Fee</th><th scope="col">Days</th><th scope="col">Contact</th></tr></thead><tbody>` +
       list.map((g) => { const s = sport(g.sport); const st = g.permitStatus || "unknown"; return `<tr class="${g.example ? "is-sample" : ""}">
-        <td><b>${esc(g.name)}</b>${g.example ? ' <span class="tag tag-example">Sample</span>' : ""}</td>
+        <th scope="row"><b>${esc(g.name)}</b>${g.example ? ' <span class="tag tag-example">Sample</span>' : ""}</th>
         <td><span class="dot" style="background:${s.color}"></span> ${esc(s.name)}</td>
         <td>${esc(g.programType)}</td>
         <td><span class="badge permit permit-${st}">${esc(D.config.permitLabels[st] || st)}</span></td>
         <td>${st === "permitted" ? (g.paidPermit ? "Paid" : "Unpaid") : "—"}</td>
         <td>${g.days.map((d) => DAYS_S[d]).join(" · ")}</td>
-        <td>${g.email ? `<a href="mailto:${esc(g.email)}">${icon("mail")}</a>` : ""}${g.website ? ` <a href="${esc(g.website)}" target="_blank" rel="noopener">${icon("globe")}</a>` : ""}</td></tr>`; }).join("") + `</tbody>`;
+        <td>${safeMail(g.email) ? `<a href="mailto:${esc(safeMail(g.email))}" aria-label="Email ${esc(g.name)}">${icon("mail")}</a>` : ""}${safeUrl(g.website) ? ` <a href="${esc(safeUrl(g.website))}" target="_blank" rel="noopener" aria-label="${esc(g.name)} website">${icon("globe")}</a>` : ""}</td></tr>`; }).join("") + `</tbody>`;
   }
   function renderGroups() {
     const matches = D.groups.filter(groupMatches);
@@ -449,8 +499,22 @@
   function handleForm(form, statusEl, buildSubject, buildBody) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      $$("input, select, textarea", form).forEach((i) => i.classList.add("touched"));
-      if (!form.checkValidity()) { statusEl.textContent = "Please complete the required fields."; statusEl.classList.add("is-error"); const bad = $(":invalid", form); if (bad) bad.focus(); return; }
+      $$(".field-error", form).forEach((n) => n.remove());
+      $$("input, select, textarea", form).forEach((i) => { i.classList.add("touched"); i.setAttribute("aria-invalid", String(!i.checkValidity())); });
+      if (!form.checkValidity()) {
+        const bad = $$(":invalid", form).filter((f) => f.name);
+        bad.forEach((f) => {
+          const lbl = f.closest("label") || f.parentElement;
+          const id = (f.name || "f") + "-err";
+          f.setAttribute("aria-describedby", id);
+          lbl.insertAdjacentHTML("beforeend", `<span class="field-error" id="${id}">${esc(f.validationMessage)}</span>`);
+        });
+        statusEl.setAttribute("role", "alert");
+        statusEl.textContent = I18.t("Please complete the required fields.") + ` (${bad.length})`;
+        statusEl.classList.add("is-error");
+        if (bad[0]) bad[0].focus();
+        return;
+      }
       statusEl.classList.remove("is-error");
       const fd = new FormData(form);
       if (API && form.id === "groupForm") {
@@ -530,6 +594,7 @@
   }
   function selectLocation(id) {
     const loc = D.mapLocations.find((l) => l.id === id);
+    if (!loc) return;
     $$(".hotspot").forEach((h) => h.classList.toggle("is-active", h.dataset.id === id));
     $$("#mapChips .chip").forEach((c) => c.classList.toggle("is-active", c.dataset.loc === id));
     const s = loc.sport ? sport(loc.sport) : null;
@@ -545,7 +610,7 @@
       </dl>
       ${loc.facility ? `<a href="#schedule" class="btn btn-dark btn-sm" data-fac="${loc.facility}">${icon("calendar")} View schedule (${weekly} weekly)</a>` : ""}</div>`;
     const f = $("[data-fac]", $("#mapCard")); if (f) f.addEventListener("click", () => setScheduleFilter("facility", f.dataset.fac));
-    if (window.innerWidth < 1024) $("#mapCard").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (window.innerWidth < 1024) $("#mapCard").scrollIntoView({ behavior: scrollBehavior(), block: "nearest" });
   }
 
   /* ---------------- featured ---------------- */
@@ -558,7 +623,7 @@
   function renderFeatured() {
     const f = D.featured;
     $("#featuredCard").innerHTML = `
-      <div class="featured-phases">${f.phases.map((p, i) => `<figure class="phase" data-image="${p.key}" data-label="lac-pitch-${["before", "during", "after"][i]}.jpg">${phaseArt(i)}<figcaption class="phase-label"><i>${i + 1}</i>${esc(p.label)}</figcaption><p class="phase-cap">${esc(p.caption)}</p></figure>`).join("")}</div>
+      <div class="featured-phases">${f.phases.map((p, i) => `<figure class="phase" data-image="${p.key}" data-label="lac-pitch-${["before", "during", "after"][i]}.jpg" data-alt="${esc(f.title)} — ${esc(p.label)}: ${esc(p.caption)}">${phaseArt(i)}<figcaption class="phase-label"><i>${i + 1}</i>${esc(p.label)}</figcaption><p class="phase-cap">${esc(p.caption)}</p></figure>`).join("")}</div>
       <div class="featured-body">
         <div>
           <p class="eyebrow">${icon("check")} ${esc(f.status)}</p>
@@ -592,10 +657,10 @@
     $$("#areaStrip .area-tile").forEach((b) => b.addEventListener("click", () => { projArea = projArea === b.dataset.area ? "" : b.dataset.area; syncAreaChips(); renderProjects(); }));
     const row = $("#areaFilters");
     row.innerHTML = `<span class="chip-label">Area</span><button class="chip${projArea ? "" : " is-active"}" data-value="">All areas</button>` + areas.map((x) => `<button class="chip${projArea === x.a ? " is-active" : ""}" data-value="${esc(x.a)}">${esc(x.a)}</button>`).join("");
-    $$("#areaFilters .chip").forEach((c) => c.addEventListener("click", () => { projArea = c.dataset.value; syncAreaChips(); renderProjects(); }));
+    $$("#areaFilters .chip").forEach((c) => { c.setAttribute("aria-pressed", String(c.dataset.value === projArea)); c.addEventListener("click", () => { projArea = c.dataset.value; syncAreaChips(); renderProjects(); }); });
   }
   function syncAreaChips() {
-    $$("#areaFilters .chip").forEach((c) => c.classList.toggle("is-active", c.dataset.value === projArea));
+    $$("#areaFilters .chip").forEach((c) => { const on = c.dataset.value === projArea; c.classList.toggle("is-active", on); c.setAttribute("aria-pressed", String(on)); });
     $$("#areaStrip .area-tile").forEach((b) => b.classList.toggle("is-active", b.dataset.area === projArea));
   }
   function renderProjects() {
@@ -630,7 +695,7 @@
     const ups = [...(D.updates || [])].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     const sportsIn = [...new Set(ups.map((u) => u.sport).filter((x) => x && x !== "all"))];
     $("#updateFilters").innerHTML = `<button class="chip${updFilter === "all" ? " is-active" : ""}" data-value="all">All</button>` + sportsIn.map((id) => `<button class="chip${updFilter === id ? " is-active" : ""}" data-value="${id}"><i class="dot" style="background:${sport(id).color}"></i>${esc(sport(id).name)}</button>`).join("");
-    $$("#updateFilters .chip").forEach((c) => c.addEventListener("click", () => { updFilter = c.dataset.value; renderUpdates(); }));
+    $$("#updateFilters .chip").forEach((c) => { c.setAttribute("aria-pressed", String(c.dataset.value === updFilter)); c.addEventListener("click", () => { updFilter = c.dataset.value; renderUpdates(); }); });
     const list = ups.filter((u) => updFilter === "all" || u.sport === updFilter || u.sport === "all");
     $("#updateList").innerHTML = list.length ? list.map((u) => { const s = u.sport && u.sport !== "all" ? sport(u.sport) : null; const g = group(u.groupId);
       return `<article class="update" style="${s ? sportStyle(s.id) : "--sport:var(--ink-3)"}">
@@ -638,8 +703,10 @@
         <h3>${esc(tr(u, "title"))}</h3><p>${esc(tr(u, "body"))}</p></article>`; }).join("") : `<p class="empty-note">No updates yet.</p>`;
   }
   function renderSubscribeSports() {
-    $("#subscribeSports").innerHTML = `<label class="sub-all"><input type="checkbox" name="sports" value="all" checked> <b>All sports</b></label>` +
-      D.sports.map((s) => `<label><input type="checkbox" name="sports" value="${s.id}"> ${esc(s.name)}</label>`).join("");
+    const chosen = $$("#subscribeSports input:checked").map((i) => i.value);
+    const on = (v) => (chosen.length ? chosen.indexOf(v) !== -1 : v === "all");
+    $("#subscribeSports").innerHTML = `<label class="sub-all"><input type="checkbox" name="sports" value="all"${on("all") ? " checked" : ""}> <b>All sports</b></label>` +
+      D.sports.map((s) => `<label><input type="checkbox" name="sports" value="${s.id}"${on(s.id) ? " checked" : ""}> ${esc(s.name)}</label>`).join("");
     const all = $('#subscribeSports input[value="all"]');
     $$("#subscribeSports input").forEach((i) => i.addEventListener("change", () => {
       if (i === all && all.checked) $$("#subscribeSports input").forEach((x) => { if (x !== all) x.checked = false; });
@@ -660,14 +727,18 @@
 
   /* ---------------- stewardship ---------------- */
   function renderStewardship() {
-    const w = D.worklog || [];
+    const all = D.worklog || [];
+    // Headline totals count verified, non-sample entries only — published numbers
+    // on a civic page should never include placeholder rows.
+    const w = all.filter((x) => !x.example);
     const hours = w.reduce((a, x) => a + Number(x.hours || 0), 0), vols = w.reduce((a, x) => a + Number(x.volunteers || 0), 0), value = w.reduce((a, x) => a + Number(x.value || 0), 0);
     $("#stewardStats").innerHTML = [[hours, "Volunteer hours"], [vols, "Volunteer shifts"], [w.length, "Work days"], [money(value), "Materials & services"]].map(([v, l]) => `<li><strong>${v}</strong><span>${l}</span></li>`).join("");
-    $("#worklogList").innerHTML = w.length ? [...w].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 8).map((x) => `<article class="work">
-      <time>${fmtDate(parseISO(x.date), { month: "short", day: "numeric", year: "numeric" })}</time>
+    $("#worklogList").innerHTML = all.length ? [...all].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 8).map((x) => `<article class="work">
+      <time>${x.date ? fmtDate(parseISO(x.date), { month: "short", day: "numeric", year: "numeric" }) : "—"}</time>
       <div><b>${esc(x.activity)}</b><span>${esc(x.organization)}${x.area ? ` · ${esc(x.area)}` : ""}${x.example ? ' <span class="tag tag-example">Sample</span>' : ""}</span></div>
       <div class="work-nums"><span>${Number(x.hours || 0)} hrs</span><span>${Number(x.volunteers || 0)} people</span>${x.value ? `<span>${money(x.value)}</span>` : ""}<span class="tag ${x.verified ? "tag-ok" : ""}">${x.verified ? "Verified" : "Pending"}</span></div></article>`).join("") : `<p class="empty-note">No work logged yet.</p>`;
     const byOrg = {}; w.forEach((x) => { byOrg[x.organization] = (byOrg[x.organization] || 0) + Number(x.hours || 0); });
+    if (!Object.keys(byOrg).length) $("#orgBars").innerHTML = "";
     const rows = Object.entries(byOrg).sort((a, b) => b[1] - a[1]); const max = rows[0] ? rows[0][1] : 1;
     $("#orgBars").innerHTML = rows.map(([org, h]) => `<div class="org-bar"><span>${esc(org)}</span><i style="--pct:${h / max}"></i><b>${h} hrs</b></div>`).join("");
     requestAnimationFrame(() => $$("#orgBars i").forEach((b) => b.classList.add("in")));
@@ -698,6 +769,7 @@
   /* ---------------- init ---------------- */
   function renderAll() {
     DAYS = I18.days; DAYS_S = I18.daysShort;
+    fillGroupFilter();
     renderSports(); renderHappening(currentRange); renderSchedule(); renderLegend(); renderLastUpdated();
     renderGroups(); renderRoster(); renderFeatured(); renderAreas(); renderProjects(); renderContribute(); renderConnect();
     renderUpdates(); renderSubscribeSports(); renderStewardship();
