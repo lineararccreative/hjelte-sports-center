@@ -1077,3 +1077,24 @@ function applyWeekendSchedule() {
   touch();
   Logger.log("Weekend programme applied: " + WEEKEND.length + " schedule rows, " + EVENTS.length + " events.");
 }
+
+
+/* ---------------------------------------------------------------------
+   One-shot: replace the Projects sheet with the shorter, simpler list.
+   The cricket ground leads and is marked completed; youth-specific and
+   build-heavy items are gone. Safe to run twice.
+   --------------------------------------------------------------------- */
+function applyProjects() {
+  const KEEP = [
+    {"id": "cricket-pitch", "area": "Fields & turf", "title": "Los Angeles Cricket Ground", "status": "COMPLETED", "description": "A 20 ft × 80 ft natural-turf cricket pitch prepared in the middle of the shared outfield, with a 420 ft playing circle marked on match days.", "impact": "A dedicated home for community cricket in the Valley, on a field that stays open to every other sport around it.", "lead": "Los Angeles Cricket", "partners": ["Community volunteers"], "goal": "", "raised": "", "volunteer": "Pitch care days — mowing, rolling and crease marking", "targetDate": ""},
+    {"id": "irrigation", "area": "Water & irrigation", "title": "Irrigation Repair — Shared Outfield", "status": "IN PROGRESS", "description": "Replacing failed sprinkler heads and adjusting coverage on the south half of the outfield, where dry patches have been spreading.", "impact": "Healthier grass across the whole outfield, for soccer, cricket and everyone else who uses it.", "lead": "Facility maintenance", "partners": ["Los Angeles Cricket"], "goal": "", "raised": "", "volunteer": "Report dry spots, join a post-work walk-through", "targetDate": ""},
+    {"id": "restroom-refresh", "area": "Restrooms", "title": "Restroom Building Refresh", "status": "PLANNING", "description": "Fixtures, lighting, doors and paint for the restroom building, plus a supply cabinet so volunteers can top up between City service visits.", "impact": "Cleaner, safer restrooms every day the fields are in use.", "lead": "Community coalition", "partners": ["City of Los Angeles Recreation and Parks (approval)"], "goal": "", "raised": "", "volunteer": "Condition survey, paint day, supply drives", "targetDate": ""},
+    {"id": "signage", "area": "Signage & wayfinding", "title": "Field Numbers & Wayfinding Signs", "status": "PLANNING", "description": "Numbers on each diamond, a map board at the entrance and QR codes that open this page, so visiting teams can find their field without asking.", "impact": "An easier arrival for new visitors, visiting teams and anyone here for the first time.", "lead": "Community coalition", "partners": ["City of Los Angeles Recreation and Parks (review)"], "goal": "", "raised": "", "volunteer": "Design, Spanish translation, installation day", "targetDate": ""},
+    {"id": "waste", "area": "Trash & recycling", "title": "Trash & Recycling Stations", "status": "PROPOSED", "description": "Paired trash and recycling bins at each field and at the parking lot entrance, emptied on a posted schedule.", "impact": "Less litter blowing across the outfield and an easier job for the volunteers who pick it up.", "lead": "Open to a lead organization", "partners": [], "goal": "", "raised": "", "volunteer": "Litter pickups, bin placement walk-through", "targetDate": ""},
+    {"id": "facility-updates", "area": "Facility updates", "title": "Small Repairs Wish List", "status": "PROPOSED", "description": "A rolling list of small fixes gathered from the people who use the park: backstop netting, dugout repairs, a bulletin board at the entrance, bike racks.", "impact": "Dozens of small fixes that together make the complex feel looked after.", "lead": "Open to a lead organization", "partners": [], "goal": "", "raised": "", "volunteer": "Walk-through audits, quick-fix days", "targetDate": ""}
+  ];
+  rows("Projects").forEach(function (r) { deleteRowBy("Projects", "id", r.id); });
+  KEEP.forEach(function (p) { upsertRow("Projects", "id", p); });
+  touch();
+  Logger.log("Projects replaced: " + KEEP.length + " rows.");
+}
