@@ -95,6 +95,8 @@
     youth: '<circle cx="12" cy="5" r="2.5"/><path d="M12 8v6M8 10l4 2 4-2M12 14l-3 6M12 14l3 6"/>',
     community: '<circle cx="8" cy="8" r="2.5"/><circle cx="16" cy="8" r="2.5"/><path d="M3 18c0-2.8 2.2-5 5-5s5 2.2 5 5M11 18c0-2.8 2.2-5 5-5s5 2.2 5 5"/>',
     other: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+    expand: '<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>',
+    close: '<path d="M18 6 6 18M6 6l12 12"/>',
     grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
     check: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
@@ -669,7 +671,7 @@
   function renderFeatured() {
     const f = D.featured;
     $("#featuredCard").innerHTML = `
-      ${f.hero ? `<figure class="featured-hero"><img src="${esc(f.hero.file)}" alt="${esc(f.hero.alt)}" loading="lazy" decoding="async"><figcaption>${esc(f.hero.caption)}</figcaption></figure>` : ""}
+      ${f.hero ? `<figure class="featured-hero"><button type="button" class="zoom-btn" data-zoom="${esc(f.hero.file)}" data-zoom-cap="${esc(f.hero.caption)}" aria-label="${esc(f.hero.caption)} — open larger"><img src="${esc(f.hero.file)}" alt="${esc(f.hero.alt)}" loading="lazy" decoding="async"><span class="zoom-hint">${icon("expand")}</span></button><figcaption>${esc(f.hero.caption)}</figcaption></figure>` : ""}
       <div class="featured-body">
         <div>
           <p class="eyebrow">${icon("check")} ${esc(f.status)}</p>
@@ -677,7 +679,7 @@
           <p class="sub">${esc(f.subtitle)}</p>
           <p class="desc">${esc(f.description)}</p>
           <div class="featured-lead"><span class="logo-tile" style="--sport:${sport("cricket").color}">LAC</span> Developed by ${esc(f.lead)}</div>
-          ${f.documents ? `<div class="featured-docs"><p class="eyebrow">Plans &amp; guides</p><div class="doc-grid">${f.documents.map((d) => `<a class="doc" href="${esc(d.file)}" target="_blank" rel="noopener"><img src="${esc(d.file)}" alt="${esc(d.label)}" loading="lazy"><span><b>${esc(d.label)}</b><small>${esc(d.caption)}</small></span></a>`).join("")}</div></div>` : ""}
+          ${f.documents ? `<div class="featured-docs"><p class="eyebrow">Plans &amp; guides</p><div class="doc-grid">${f.documents.map((d) => `<button type="button" class="doc" data-zoom="${esc(d.file)}" data-zoom-cap="${esc(d.label)} — ${esc(d.caption)}"><img src="${esc(d.file)}" alt="" loading="lazy"><span><b>${esc(d.label)}</b><small>${esc(d.caption)}</small></span>${icon("expand")}</button>`).join("")}</div></div>` : ""}
         </div>
         <dl class="fact-grid">
           ${f.geometry ? `<div class="fact wide"><dt>Ground geometry</dt><dd><ul class="geo">${f.geometry.map(([k, v]) => `<li><span>${esc(k)}</span><b>${esc(v)}</b></li>`).join("")}</ul></dd></div>` : ""}
@@ -699,7 +701,7 @@
       return { a, total: ps.length, active: active.length, next };
     }).filter((x) => x.total);
     $("#areaStrip").innerHTML = areas.map((x) => `<button class="area-tile${projArea === x.a ? " is-active" : ""}" data-area="${esc(x.a)}">
-      <b>${esc(x.a)}</b><span>${x.total} ${x.total === 1 ? "project" : "projects"}</span>${x.next ? `<small>Target ${esc(x.next)}</small>` : (x.total - x.active ? `<small>${x.total - x.active} ${I18.t("Completed").toLowerCase()}</small>` : "")}</button>`).join("");
+      <b>${esc(x.a)}</b><span>${x.total} ${x.total === 1 ? "project" : "projects"}</span>${x.next ? `<small>Target ${esc(x.next)}</small>` : (x.active ? `<small>Target TBD</small>` : `<small>${x.total} ${I18.t("Completed").toLowerCase()}</small>`)}</button>`).join("");
     $$("#areaStrip .area-tile").forEach((b) => b.addEventListener("click", () => { projArea = projArea === b.dataset.area ? "" : b.dataset.area; syncAreaChips(); renderProjects(); }));
     const row = $("#areaFilters");
     row.innerHTML = `<span class="chip-label">Area</span><button class="chip${projArea ? "" : " is-active"}" data-value="">All areas</button>` + areas.map((x) => `<button class="chip${projArea === x.a ? " is-active" : ""}" data-value="${esc(x.a)}">${esc(x.a)}</button>`).join("");
@@ -726,7 +728,6 @@
         ${p.status === "COMPLETED" ? `<a href="#featured" class="btn btn-outline btn-sm">See the story</a>` : `<a href="#connect" class="btn btn-primary btn-sm" data-topic="Fund a project" data-msg="I'd like to support the project: ${esc(p.title)}.%0A%0AHow I can help (funds, materials, volunteer time, introductions):%0A">Support This Project</a>`}
       </article>`;
     }).join("") || `<p class="empty-note" style="grid-column:1/-1">No projects with this status yet.</p>`;
-    requestAnimationFrame(() => $$("#projectGrid .progress-bar i").forEach((b) => b.classList.add("in")));
   }
   $("#projectFilters").addEventListener("click", (e) => {
     const chip = e.target.closest(".chip"); if (!chip) return;
@@ -806,6 +807,37 @@
     ].map(([ic, t, v]) => `<div><dt><span class="ic">${icon(ic)}</span>${t}</dt><dd>${v}</dd></div>`).join("");
     $("#mapsLink").href = c.mapsUrl; $("#cityLink").href = c.cityPageUrl;
     $("#year").textContent = new Date().getFullYear();
+  }
+
+  /* ---------------- lightbox ---------------- */
+  /* One <dialog> serves every zoomable image: it lives in the top layer, so no
+     stacking context can clip it, and Esc / backdrop click close it for free. */
+  const lb = $("#lightbox"), lbImg = $("#lightboxImg"), lbCap = $("#lightboxCap");
+  function openLightbox(src, caption, alt) {
+    if (!lb || !src) return;
+    lbImg.src = src; lbImg.alt = alt || caption || "";
+    lbCap.textContent = caption || "";
+    lbCap.hidden = !caption;
+    if (typeof lb.showModal === "function") lb.showModal(); else lb.setAttribute("open", "");
+    $("#lightboxClose").focus();
+  }
+  function closeLightbox() {
+    if (!lb) return;
+    if (typeof lb.close === "function") lb.close(); else lb.removeAttribute("open");
+    lbImg.removeAttribute("src");
+  }
+  if (lb) {
+    document.addEventListener("click", (e) => {
+      const t = e.target.closest("[data-zoom]");
+      if (!t) return;
+      e.preventDefault();
+      const img = t.querySelector("img");
+      openLightbox(t.dataset.zoom, t.dataset.zoomCap || "", img ? img.alt : "");
+    });
+    $("#lightboxClose").addEventListener("click", closeLightbox);
+    // clicking the backdrop (the dialog element itself, outside the figure) closes
+    lb.addEventListener("click", (e) => { if (e.target === lb) closeLightbox(); });
+    lb.addEventListener("close", () => lbImg.removeAttribute("src"));
   }
 
   /* ---------------- init ---------------- */

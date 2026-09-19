@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
+  <script>document.documentElement.className = document.documentElement.className.replace("no-js", "js");</script>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Hjelte Sports Center — Community Sports Hub · Encino, CA</title>
   <meta name="description" content="Softball, baseball, cricket and soccer fields at Hjelte Sports Center, 16200 Burbank Blvd, Encino (Sepulveda Basin). Schedules, groups and field permit info.">
   <meta name="theme-color" content="#1C1F22">
@@ -27,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/img/hero-aerial.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="css/styles.css?v=2026-09-19e">
+  <link rel="stylesheet" href="css/styles.css?v=2026-09-19f">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -718,6 +719,16 @@
 </footer>
 
 <!-- ============================ MODAL ============================ -->
+<dialog class="lightbox" id="lightbox" aria-label="Image viewer">
+  <button type="button" class="lightbox-close" id="lightboxClose" aria-label="Close image">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>
+  </button>
+  <figure class="lightbox-figure">
+    <img id="lightboxImg" alt="">
+    <figcaption id="lightboxCap"></figcaption>
+  </figure>
+</dialog>
+
 <div class="modal" id="modal" hidden>
   <div class="modal-backdrop" data-close></div>
   <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
@@ -728,8 +739,8 @@
 
 <button class="to-top" id="toTop" aria-label="Back to top">↑</button>
 
-<script src="js/data.js?v=2026-09-19e"></script>
-<script src="js/i18n.js?v=2026-09-19e"></script>
-<script src="js/app.js?v=2026-09-19e"></script>
+<script src="js/data.js?v=2026-09-19f"></script>
+<script src="js/i18n.js?v=2026-09-19f"></script>
+<script src="js/app.js?v=2026-09-19f"></script>
 </body>
 </html>

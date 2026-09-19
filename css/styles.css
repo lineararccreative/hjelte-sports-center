@@ -556,8 +556,9 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .to-top.is-visible { opacity: 1; pointer-events: auto; transform: none; }
 
 /* ---------- Reveal animations ---------- */
-.reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
-.reveal.in { opacity: 1; transform: none; }
+.reveal { opacity: 1; transform: none; }
+.js .reveal { opacity: 0; transform: translateY(18px); transition: opacity .7s var(--ease), transform .7s var(--ease); }
+.js .reveal.in { opacity: 1; transform: none; }
 .hero .reveal:nth-child(2) { transition-delay: .05s; }
 .hero .reveal:nth-child(3) { transition-delay: .1s; }
 .hero .reveal:nth-child(4) { transition-delay: .15s; }
@@ -616,11 +617,43 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .info-list dt { display: flex; align-items: center; gap: 12px; }
 .info-list dd { margin: 6px 0 0; padding-left: 52px; }
 
+/* ---------- Image lightbox ---------- */
+/* <dialog> puts this in the top layer, so no ancestor overflow can clip it. */
+.lightbox { width: min(100vw, 1200px); max-width: 100vw; height: 100dvh; max-height: 100dvh; padding: 0; border: 0; background: transparent; overflow: hidden; }
+.lightbox::backdrop { background: rgba(14, 16, 18, .88); backdrop-filter: blur(6px); }
+.lightbox[open] { display: grid; place-items: center; }
+.lightbox-figure { margin: 0; display: grid; gap: 14px; justify-items: center; padding: calc(64px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); max-height: 100dvh; }
+.lightbox-figure img { max-width: 100%; max-height: calc(100dvh - 150px); width: auto; height: auto; border-radius: 14px; box-shadow: 0 24px 60px rgba(0,0,0,.5); background: #14171a; }
+.lightbox-figure figcaption { color: rgba(255,255,255,.82); font-size: .88rem; text-align: center; max-width: 62ch; text-wrap: pretty; }
+.lightbox-figure figcaption[hidden] { display: none; }
+.lightbox-close { position: fixed; top: calc(14px + env(safe-area-inset-top)); right: calc(14px + env(safe-area-inset-right)); width: 48px; height: 48px; border-radius: 50%; border: 0; display: grid; place-items: center; background: rgba(255,255,255,.14); color: #fff; cursor: pointer; transition: background .18s, transform .18s var(--ease); }
+.lightbox-close:hover { background: rgba(255,255,255,.26); }
+.lightbox-close:active { transform: scale(.94); }
+.lightbox-close:focus-visible { outline: 3px solid var(--gold); outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .lightbox::backdrop { backdrop-filter: none; } .lightbox-close:active { transform: none; } }
+
+/* the trigger: an image you can open */
+.zoom-btn { display: block; width: 100%; padding: 0; border: 0; background: none; cursor: zoom-in; position: relative; }
+.zoom-btn img { display: block; width: 100%; }
+.zoom-hint { position: absolute; right: 12px; bottom: 12px; width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: rgba(20,22,24,.62); color: #fff; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.zoom-btn:hover .zoom-hint, .zoom-btn:focus-visible .zoom-hint { opacity: 1; }
+@media (hover: none) { .zoom-hint { opacity: 1; } }
+
 /* ---------- Featured hero photo ---------- */
 .featured-hero { margin: 0; grid-column: 1 / -1; }
 .featured-hero img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center 62%; border-radius: var(--radius) var(--radius) 0 0; background: var(--ink); }
 .featured-hero figcaption { padding: 10px 22px 0; font-size: .82rem; color: var(--muted); }
 @media (max-width: 767.98px) { .featured-hero img { aspect-ratio: 4 / 3; } }
+@media (min-width: 1024px) {
+  /* the pitch photo is portrait, so give it a tall column of its own */
+  .featured-card { display: grid; grid-template-columns: minmax(300px, .8fr) 1.2fr; align-items: stretch; }
+  /* the hero spans both columns by default; in the split it owns column one */
+  .featured-hero { grid-column: 1; display: flex; flex-direction: column; min-height: 100%; background: #14171a; }
+  .featured-hero .zoom-btn { flex: 1 1 auto; min-height: 0; }
+  .featured-hero img { height: 100%; min-height: 520px; aspect-ratio: auto; border-radius: 0; object-position: center 58%; }
+  .featured-hero figcaption { padding: 12px 20px 16px; }
+  .featured-body { grid-template-columns: 1fr; gap: 28px; align-content: start; }
+}
 .fund-line { margin: 14px 0 16px; font-size: .9rem; color: var(--ink-3); }
 .fund-line b { color: var(--ink); }
 
@@ -786,7 +819,9 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .featured-docs .eyebrow { color: var(--gold); }
 .doc-grid { display: grid; gap: 14px; }
 @media (min-width: 720px) { .doc-grid { grid-template-columns: 1fr 1fr; } }
-.doc { display: grid; grid-template-columns: 140px 1fr; gap: 14px; align-items: center; background: rgba(255,255,255,.06); border: 1px solid var(--line-dark); border-radius: 12px; padding: 10px; transition: background .2s; }
+.doc { display: grid; grid-template-columns: 140px 1fr auto; gap: 14px; align-items: center; text-align: left; width: 100%; font: inherit; color: inherit; cursor: zoom-in; background: rgba(255,255,255,.06); border: 1px solid var(--line-dark); border-radius: 12px; padding: 10px; transition: background .2s, transform .18s var(--ease); }
+.doc:active { transform: scale(.99); }
+.doc > svg.i { color: rgba(255,255,255,.55); width: 18px; height: 18px; }
 .doc:hover { background: rgba(255,255,255,.1); }
 .doc img { width: 140px; height: 90px; object-fit: cover; border-radius: 8px; }
 .doc b { display: block; font-family: var(--display); font-size: 1.1rem; }
@@ -855,4 +890,69 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .contribute-card .btn, .group-links .btn { white-space: normal; }
 @media (min-width: 1024px) and (max-width: 1199.98px) {
   .contribute-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+
+/* =====================================================================
+   Mobile feel
+   ---------------------------------------------------------------------
+   The page is used one-handed, outdoors, on a phone. These rules give it
+   the things a native app gets for free: safe areas, immediate tap
+   feedback, no zoom-on-focus, sheets that behave, and rows that swipe.
+   ===================================================================== */
+
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: calc(var(--header-h) + 12px); }
+body { overscroll-behavior-y: none; }
+a, button, summary, [role="button"], label, select, input, textarea { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
+
+/* iOS zooms the viewport when a control's text is under 16px */
+@media (max-width: 767.98px) {
+  input, select, textarea,
+  .filter-bar select, .directory-tools input,
+  .form-card input, .form-card select, .form-card textarea,
+  .subscribe input, .subscribe select { font-size: 16px; }
+}
+
+/* safe areas: notch, home indicator, landscape ears */
+.site-header > .container { padding-left: max(20px, env(safe-area-inset-left)); padding-right: max(20px, env(safe-area-inset-right)); }
+.site-footer { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+.to-top { bottom: calc(16px + env(safe-area-inset-bottom)); right: calc(16px + env(safe-area-inset-right)); }
+.modal-panel { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+
+/* press feedback — the single biggest thing that reads as "app" on touch */
+@media (hover: none) {
+  .btn:active, .chip:active, .tab:active, .mode-btn:active, .area-tile:active,
+  .contribute-card:active, .sport-card:active, .doc:active, .zoom-btn:active,
+  .map-chips .chip:active { transform: scale(.97); }
+  .btn, .chip, .tab, .mode-btn, .area-tile, .contribute-card, .sport-card,
+  .doc, .zoom-btn { transition: transform .12s cubic-bezier(.22,1,.36,1); }
+}
+
+/* the modal already slides up from the bottom on phones; finish the sheet */
+@media (max-width: 719.98px) {
+  .modal-panel { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding-top: 34px; }
+  .modal-panel::before { content: ""; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); width: 40px; height: 5px; border-radius: 3px; background: var(--off-2, #DEDCD5); }
+  .modal-close { top: 28px; }
+}
+
+/* filter and location rows swipe sideways instead of stacking into a wall */
+@media (max-width: 767.98px) {
+  .chip-row { display: flex; flex-wrap: nowrap; overflow-x: auto; gap: 8px; padding-bottom: 4px;
+    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  .chip-row::-webkit-scrollbar { display: none; }
+  .chip-row .chip { flex: 0 0 auto; margin: 0; scroll-snap-align: start; }
+  .chip-row .chip-label { flex: 0 0 auto; position: sticky; left: 0; background: var(--bg, #fff);
+    padding-right: 8px; z-index: 1; }
+  .map-chips { flex-wrap: nowrap; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; padding-bottom: 4px; }
+  .map-chips::-webkit-scrollbar { display: none; }
+  .map-chips .chip { flex: 0 0 auto; scroll-snap-align: start; }
+  .tabs { display: flex; max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .tabs::-webkit-scrollbar { display: none; }
+  .tabs .tab { flex: 0 0 auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn, .chip, .tab, .mode-btn, .area-tile, .contribute-card, .sport-card, .doc, .zoom-btn { transition: none; }
+  .btn:active, .chip:active, .tab:active, .mode-btn:active, .area-tile:active,
+  .contribute-card:active, .sport-card:active, .doc:active, .zoom-btn:active { transform: none; }
 }
