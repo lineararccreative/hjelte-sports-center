@@ -26,7 +26,6 @@
   const isoDate = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   const parseISO = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
   const fmtDate = (d, opts = { weekday: "long", month: "long", day: "numeric" }) => d.toLocaleDateString(I18.locale, opts);
-  const money = (n) => "$" + Number(n).toLocaleString("en-US");
   const UNKNOWN_SPORT = { id: "unknown", name: "Other", color: "#63676C", icon: "other", activities: [], blurb: "" };
   const sport = (id) => D.sports.find((s) => s.id === id) || (id && console.warn("Unknown sport id:", id), D.sports.find((s) => s.id === id) || UNKNOWN_SPORT);
   const group = (id) => D.groups.find((g) => g.id === id) || null;
@@ -657,16 +656,10 @@
   }
 
   /* ---------------- featured ---------------- */
-  function phaseArt(i) {
-    const base = `<svg class="ph-art" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><pattern id="ph${i}" width="26" height="300" patternUnits="userSpaceOnUse" patternTransform="rotate(-6)"><rect width="13" height="300" fill="#2B6B42"/><rect x="13" width="13" height="300" fill="#2F7449"/></pattern></defs><rect width="400" height="300" fill="url(#ph${i})"/>`;
-    if (i === 0) return base + `</svg>`;
-    if (i === 1) return base + `<rect x="170" y="40" width="60" height="220" fill="#7A5A3A"/><rect x="176" y="46" width="48" height="208" fill="#8F6B45"/><path d="M150 40h100M150 260h100" stroke="#F1EEE6" stroke-width="2" stroke-dasharray="8 6"/></svg>`;
-    return base + `<rect x="178" y="40" width="44" height="220" fill="#D8C48A"/><path d="M178 70h44M178 230h44M200 70v-12M200 230v12" stroke="#fff" stroke-width="2"/><ellipse cx="200" cy="150" rx="150" ry="120" fill="none" stroke="#F1EEE6" stroke-width="2" opacity=".6"/></svg>`;
-  }
   function renderFeatured() {
     const f = D.featured;
     $("#featuredCard").innerHTML = `
-      <div class="featured-phases">${f.phases.map((p, i) => `<figure class="phase" data-image="${p.key}" data-label="lac-pitch-${["before", "during", "after"][i]}.jpg" data-alt="${esc(f.title)} — ${esc(p.label)}: ${esc(p.caption)}">${phaseArt(i)}<figcaption class="phase-label"><i>${i + 1}</i>${esc(p.label)}</figcaption><p class="phase-cap">${esc(p.caption)}</p></figure>`).join("")}</div>
+      ${f.hero ? `<figure class="featured-hero"><img src="${esc(f.hero.file)}" alt="${esc(f.hero.alt)}" loading="lazy" decoding="async"><figcaption>${esc(f.hero.caption)}</figcaption></figure>` : ""}
       <div class="featured-body">
         <div>
           <p class="eyebrow">${icon("check")} ${esc(f.status)}</p>
@@ -674,6 +667,7 @@
           <p class="sub">${esc(f.subtitle)}</p>
           <p class="desc">${esc(f.description)}</p>
           <div class="featured-lead"><span class="logo-tile" style="--sport:${sport("cricket").color}">LAC</span> Developed by ${esc(f.lead)}</div>
+          ${f.documents ? `<div class="featured-docs"><p class="eyebrow">Plans &amp; guides</p><div class="doc-grid">${f.documents.map((d) => `<a class="doc" href="${esc(d.file)}" target="_blank" rel="noopener"><img src="${esc(d.file)}" alt="${esc(d.label)}" loading="lazy"><span><b>${esc(d.label)}</b><small>${esc(d.caption)}</small></span></a>`).join("")}</div></div>` : ""}
         </div>
         <dl class="fact-grid">
           ${f.geometry ? `<div class="fact wide"><dt>Ground geometry</dt><dd><ul class="geo">${f.geometry.map(([k, v]) => `<li><span>${esc(k)}</span><b>${esc(v)}</b></li>`).join("")}</ul></dd></div>` : ""}
@@ -683,8 +677,7 @@
           <div class="fact wide"><dt>Partners</dt><dd><div class="partner-list">${f.partners.map((p) => `<span>${esc(p)}</span>`).join("")}</div></dd></div>
         </dl>
       </div>
-      ${f.documents ? `<div class="featured-docs"><p class="eyebrow">Plans &amp; guides</p><div class="doc-grid">${f.documents.map((d) => `<a class="doc" href="${esc(d.file)}" target="_blank" rel="noopener"><img src="${esc(d.file)}" alt="${esc(d.label)}" loading="lazy"><span><b>${esc(d.label)}</b><small>${esc(d.caption)}</small></span></a>`).join("")}</div></div>` : ""}`;
-    $$("#featuredCard .phase").forEach((ph) => applyImage(ph, ph.dataset.image));
+`;
   }
 
   /* ---------------- projects ---------------- */
@@ -720,7 +713,7 @@
           ${p.partners.length ? `<div><b>Partners:</b> ${p.partners.map(esc).join(", ")}</div>` : ""}
           <div><b>Volunteer:</b> ${esc(p.volunteer)}</div>
         </div>
-        ${pct !== null ? `<div class="progress"><div class="progress-bar"><i style="--pct:${pct}"></i></div><div class="progress-text"><span><b>${money(p.raised || 0)}</b> raised</span><span>Goal ${money(p.goal)}</span></div></div>` : ""}
+        <p class="fund-line"><b>Funding needed:</b> TBD</p>
         ${p.status === "COMPLETED" ? `<a href="#featured" class="btn btn-outline btn-sm">See the story</a>` : `<a href="#connect" class="btn btn-primary btn-sm" data-topic="Fund a project" data-msg="I'd like to support the project: ${esc(p.title)}.%0A%0AHow I can help (funds, materials, volunteer time, introductions):%0A">Support This Project</a>`}
       </article>`;
     }).join("") || `<p class="empty-note" style="grid-column:1/-1">No projects with this status yet.</p>`;
@@ -774,12 +767,12 @@
     // Headline totals count verified, non-sample entries only — published numbers
     // on a civic page should never include placeholder rows.
     const w = all.filter((x) => !isSample(x));
-    const hours = w.reduce((a, x) => a + Number(x.hours || 0), 0), vols = w.reduce((a, x) => a + Number(x.volunteers || 0), 0), value = w.reduce((a, x) => a + Number(x.value || 0), 0);
-    $("#stewardStats").innerHTML = [[hours, "Volunteer hours"], [vols, "Volunteer shifts"], [w.length, "Work days"], [money(value), "Materials & services"]].map(([v, l]) => `<li><strong>${v}</strong><span>${l}</span></li>`).join("");
+    const hours = w.reduce((a, x) => a + Number(x.hours || 0), 0), vols = w.reduce((a, x) => a + Number(x.volunteers || 0), 0);
+    $("#stewardStats").innerHTML = [[hours, "Volunteer hours"], [vols, "Volunteer shifts"], [w.length, "Work days"], ["TBD", "Materials & services"]].map(([v, l]) => `<li><strong>${v}</strong><span>${l}</span></li>`).join("");
     $("#worklogList").innerHTML = all.length ? [...all].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 8).map((x) => `<article class="work">
       <time>${x.date ? fmtDate(parseISO(x.date), { month: "short", day: "numeric", year: "numeric" }) : "—"}</time>
       <div><b>${esc(x.activity)}</b><span>${esc(x.organization)}${x.area ? ` · ${esc(x.area)}` : ""}${isSample(x) ? ' <span class="tag tag-example">Sample</span>' : ""}</span></div>
-      <div class="work-nums"><span>${Number(x.hours || 0)} hrs</span><span>${Number(x.volunteers || 0)} people</span>${x.value ? `<span>${money(x.value)}</span>` : ""}<span class="tag ${x.verified ? "tag-ok" : ""}">${x.verified ? "Verified" : "Pending"}</span></div></article>`).join("") : `<p class="empty-note">No work logged yet.</p>`;
+      <div class="work-nums"><span>${Number(x.hours || 0)} hrs</span><span>${Number(x.volunteers || 0)} people</span><span class="tag ${x.verified ? "tag-ok" : ""}">${x.verified ? "Verified" : "Pending"}</span></div></article>`).join("") : `<p class="empty-note">No work logged yet.</p>`;
     const byOrg = {}; w.forEach((x) => { byOrg[x.organization] = (byOrg[x.organization] || 0) + Number(x.hours || 0); });
     if (!Object.keys(byOrg).length) $("#orgBars").innerHTML = "";
     const rows = Object.entries(byOrg).sort((a, b) => b[1] - a[1]); const max = rows[0] ? rows[0][1] : 1;
@@ -800,10 +793,7 @@
     const c = D.config;
     $("#infoList").innerHTML = [
       ["pin", "Address", `<a href="${c.mapsUrl}" target="_blank" rel="noopener">${esc(c.address)}</a>`],
-      ["clock", "Facility hours", esc(c.hours)],
-      ["phone", "Permit office (City of LA Rec & Parks)", `<a href="tel:${c.permitOfficePhone.replace(/\D/g, "")}">${esc(c.permitOfficePhone)}</a>`],
-      ["mail", "Community hub email", `<a href="mailto:${c.contactEmail}">${esc(c.contactEmail)}</a>`],
-      ["info", "Region", esc(c.region)]
+      ["clock", "Facility hours", esc(c.hours)]
     ].map(([ic, t, v]) => `<div><span class="ic">${icon(ic)}</span><div><dt>${t}</dt><dd>${v}</dd></div></div>`).join("");
     $("#mapsLink").href = c.mapsUrl; $("#cityLink").href = c.cityPageUrl;
     $("#year").textContent = new Date().getFullYear();

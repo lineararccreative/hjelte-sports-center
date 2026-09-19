@@ -509,7 +509,8 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .connect { background: var(--ink-2); color: #fff; }
 .connect .eyebrow { color: var(--gold); }
 .info-list { display: grid; gap: 18px; margin: 28px 0; }
-.info-list div { display: grid; grid-template-columns: 40px 1fr; gap: 14px; align-items: start; }
+.info-list > div { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 14px; align-items: center; }
+.info-list > div > div { min-width: 0; }
 .info-list .ic { width: 40px; height: 40px; border-radius: 12px; background: rgba(255,255,255,.08); color: var(--gold); display: grid; place-items: center; }
 .info-list .ic svg { width: 20px; height: 20px; }
 .info-list dt { font-size: .68rem; text-transform: uppercase; letter-spacing: .12em; color: rgba(255,255,255,.55); font-weight: 700; }
@@ -599,6 +600,14 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .map-scale rect { fill: #F1EEE6; stroke: #1C1F22; stroke-width: 1; }
 .map-scale text { font-family: var(--body); font-size: 10px; fill: #1C1F22; font-weight: 600; }
 .map-credit { margin: 10px 8px 4px; font-size: .74rem; color: rgba(255,255,255,.6); line-height: 1.4; }
+
+/* ---------- Featured hero photo ---------- */
+.featured-hero { margin: 0; grid-column: 1 / -1; }
+.featured-hero img { display: block; width: 100%; aspect-ratio: 16 / 9; object-fit: cover; object-position: center 62%; border-radius: var(--radius) var(--radius) 0 0; background: var(--ink); }
+.featured-hero figcaption { padding: 10px 22px 0; font-size: .82rem; color: var(--muted); }
+@media (max-width: 767.98px) { .featured-hero img { aspect-ratio: 4 / 3; } }
+.fund-line { margin: 14px 0 16px; font-size: .9rem; color: var(--ink-3); }
+.fund-line b { color: var(--ink); }
 
 /* ---------- Permit notice (below the hero) ---------- */
 .permit-notice { background: var(--gold-light); border-top: 1px solid rgba(201,162,39,.35); border-bottom: 1px solid rgba(201,162,39,.35); padding: 22px 0; }
@@ -755,8 +764,10 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .geo li { display: flex; justify-content: space-between; gap: 12px; font-size: .86rem; border-bottom: 1px solid var(--line-dark); padding-bottom: 6px; }
 .geo li span { color: rgba(255,255,255,.65); }
 .geo li b { text-align: right; }
-.featured-docs { padding: 0 24px 32px; }
-@media (min-width: 900px) { .featured-docs { padding: 0 40px 40px; } }
+.featured-docs { padding: 26px 0 0; }
+@media (min-width: 900px) { .featured-docs { padding: 30px 0 0; } }
+/* inside the featured card the plans sit in one narrow column, so one per row */
+.featured-body .doc-grid { grid-template-columns: 1fr; }
 .featured-docs .eyebrow { color: var(--gold); }
 .doc-grid { display: grid; gap: 14px; }
 @media (min-width: 720px) { .doc-grid { grid-template-columns: 1fr 1fr; } }
@@ -819,12 +830,13 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .permit-note { border-top: 1px solid var(--line-dark); margin-top: 24px; padding-top: 20px; }
 .permit-note h3 { font-size: 1.3rem; margin-bottom: 8px; }
 .permit-note p { font-size: .92rem; color: rgba(255,255,255,.78); margin: 0; }
+.connect .fine-print { margin-top: 18px; }
 .permit-note a { color: var(--gold); border-bottom: 1px solid rgba(201,162,39,.4); }
 
 /* ---------- Overflow guards: grid items must be allowed to shrink ---------- */
 .grid-2 > *, .contribute-grid > *, .group-grid > *, .project-grid > *, .sport-grid > * { min-width: 0; }
 .info-list dd, .group-desc, .update p, .work b { overflow-wrap: anywhere; }
-.info-list div { grid-template-columns: 40px minmax(0, 1fr); }
+.info-list > div { grid-template-columns: 40px minmax(0, 1fr); }
 .contribute-card .btn, .group-links .btn { white-space: normal; }
 @media (min-width: 1024px) and (max-width: 1199.98px) {
   .contribute-grid { grid-template-columns: repeat(3, 1fr); }

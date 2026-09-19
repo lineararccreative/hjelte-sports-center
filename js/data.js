@@ -350,11 +350,11 @@ window.HJELTE = {
       { label: "Ground plan & dimensions", file: "assets/img/lac-ground-specs.jpg", caption: "Enhanced aerial concept with measured spans. Google Maps estimates, not a survey." },
       { label: "Visitor guide", file: "assets/img/cricket-visitor-guide.jpg", caption: "Quick guide for park visitors when cricket is in progress." }
     ],
-    phases: [
-      { key: "featuredBefore", label: "Before", caption: "Open turf prior to pitch development." },
-      { key: "featuredDuring", label: "During construction", caption: "Grading, soil preparation and turf establishment." },
-      { key: "featuredAfter",  label: "Completed pitch", caption: "Natural-turf pitch ready for play." }
-    ]
+    hero: {
+      file: "assets/img/lac-pitch-hero.webp",
+      alt: "The completed Los Angeles Cricket Ground at Hjelte Sports Center — prepared natural-turf pitch with stumps set, the outfield and floodlights behind.",
+      caption: "The completed pitch at Hjelte, set up for play."
+    }
   },
 
   /* ------------------------------------------------------------------
@@ -365,27 +365,27 @@ window.HJELTE = {
     { id: "restroom-refresh", area: "Restrooms", title: "Restroom Building Refresh", status: "PLANNING",
       description: "Fixtures, lighting, doors and paint for the central restroom building, plus a cleaning-supply cabinet for volunteer touch-ups between City service visits.",
       impact: "Cleaner, safer restrooms for every visitor, every day the fields are in use.",
-      lead: "Community coalition", partners: ["City of Los Angeles Recreation and Parks (approval)", "Local plumbing trades (proposed)"], goal: 24000, raised: 3100,
+      lead: "Community coalition", partners: ["City of Los Angeles Recreation and Parks (approval)", "Local plumbing trades (proposed)"], goal: null, raised: null,
       volunteer: "Condition survey, paint day, supply drives", targetDate: "2027-03" },
     { id: "portable-restrooms", area: "Restrooms", title: "Tournament-Day Portable Restrooms", status: "FUNDRAISING",
       description: "A seasonal fund for additional portable units with hand-washing stations on tournament and family-day weekends.",
       impact: "Shorter lines and better hygiene on the busiest days of the year.",
-      lead: "Softball & baseball programs", partners: ["Los Angeles Cricket", "Youth soccer programs"], goal: 4800, raised: 1750,
+      lead: "Softball & baseball programs", partners: ["Los Angeles Cricket", "Youth soccer programs"], goal: null, raised: null,
       volunteer: "Event-day coordination" },
     { id: "facility-updates", area: "Facility updates", title: "Facility Updates Wish List", status: "PROPOSED",
       description: "Rolling list gathered from users: backstop netting repairs, dugout roofs, a bulletin board at the entrance, bike racks and trash/recycling pairs at each field.",
       impact: "Dozens of small fixes that together make the complex feel cared for.",
-      lead: "Open to a lead organization", partners: [], goal: 15000, raised: 0,
+      lead: "Open to a lead organization", partners: [], goal: null, raised: null,
       volunteer: "Walk-through audits, prioritizing the list, quick-fix days" },
     { id: "shade", area: "Seating & shade", title: "Shade Structures at the Diamond Cluster", status: "FUNDRAISING",
       description: "Two shade canopies over the shared bleachers between Diamonds 1–4.",
       impact: "Cooler, safer spectating for families across all softball programs on hot Valley afternoons.",
-      lead: "Community coalition", partners: ["Local businesses", "Softball leagues"], goal: 18000, raised: 6400,
+      lead: "Community coalition", partners: ["Local businesses", "Softball leagues"], goal: null, raised: null,
       volunteer: "Fundraising committee, install-day helpers" },
     { id: "hydration", area: "Water & irrigation", title: "Hydration Stations", status: "PLANNING",
       description: "Bottle-filling stations near the restroom building and the west entrance.",
       impact: "Free water for thousands of players and visitors each season; fewer single-use bottles.",
-      lead: "Open to a lead organization", partners: [], goal: 9500, raised: 0,
+      lead: "Open to a lead organization", partners: [], goal: null, raised: null,
       volunteer: "Grant research, site survey" },
     { id: "irrigation", area: "Water & irrigation", title: "Irrigation Repair — Shared Outfield", status: "IN PROGRESS",
       description: "Replace failed heads and adjust coverage on the south half of the shared outfield.",
@@ -395,22 +395,22 @@ window.HJELTE = {
     { id: "youth-equipment", area: "Equipment", title: "Youth Equipment Library", status: "PROPOSED",
       description: "A shared, lockable cache of youth bats, balls, cones, goals and stumps that any program can borrow.",
       impact: "Lowers the cost of starting a youth program at Hjelte.",
-      lead: "Open to a lead organization", partners: ["Youth programs"], goal: 6000, raised: 0,
+      lead: "Open to a lead organization", partners: ["Youth programs"], goal: null, raised: null,
       volunteer: "Equipment drives, inventory keeping" },
     { id: "signage", area: "Signage & wayfinding", title: "Community Wayfinding Signage", status: "PLANNING",
       description: "Field numbers, a facility map board at the entrance and QR codes linking to this hub.",
       impact: "Easier arrival for new visitors and visiting teams.",
-      lead: "Community coalition", partners: ["City of Los Angeles Recreation and Parks (review)"], goal: 4500, raised: 1200,
+      lead: "Community coalition", partners: ["City of Los Angeles Recreation and Parks (review)"], goal: null, raised: null,
       volunteer: "Design, translation, installation" },
     { id: "benches", area: "Seating & shade", title: "Sideline Benches — Shared Outfield", status: "FUNDRAISING",
       description: "Six durable benches along the outfield edges between the diamonds.",
       impact: "Seating for youth teams and families where none exists today.",
-      lead: "Youth soccer programs", partners: ["Neighborhood council (proposed)"], goal: 7200, raised: 2900,
+      lead: "Youth soccer programs", partners: ["Neighborhood council (proposed)"], goal: null, raised: null,
       volunteer: "Install-day helpers" },
     { id: "scoreboard", area: "Equipment", title: "Portable Scoreboards", status: "PROPOSED",
       description: "Two battery-powered portable scoreboards shareable across softball, baseball and cricket.",
       impact: "A better game-day experience for every sport without fixed installations.",
-      lead: "Open to a lead organization", partners: [], goal: 5400, raised: 0,
+      lead: "Open to a lead organization", partners: [], goal: null, raised: null,
       volunteer: "Sponsor outreach" },
     { id: "cricket-pitch", area: "Fields & turf", title: "Los Angeles Cricket Ground", status: "COMPLETED",
       description: "20 ft × 80 ft natural-turf cricket pitch developed within the open field.",
@@ -421,15 +421,15 @@ window.HJELTE = {
 
   /* ------------------------------------------------------------------
      Stewardship work log — effort put into maintaining and improving
-     the park. hours = people-hours; value = estimated $ of materials/services.
+     the park. hours = people-hours; value is no longer displayed; costs are tracked off-site.
      ------------------------------------------------------------------ */
   worklog: [
-    { id: "w1", date: "2026-09-12", organization: "Los Angeles Cricket", groupId: "lac", activity: "Cricket pitch mowing, rolling and crease re-marking", area: "Fields & turf", hours: 14, volunteers: 5, materials: "Line paint, fuel", value: 120, verified: true },
-    { id: "w2", date: "2026-09-06", organization: "Valley Evening Softball League", groupId: "ex-softball-league", activity: "Infield dragging and base-peg repair, Diamonds 3–4", area: "Fields & turf", hours: 9, volunteers: 4, materials: "Base pegs", value: 60, verified: true, example: true },
-    { id: "w3", date: "2026-08-30", organization: "Basin Walk & Talk Club", groupId: "ex-walk-club", activity: "Perimeter road litter pickup", area: "Facility updates", hours: 6, volunteers: 6, materials: "Bags, gloves", value: 25, verified: true, example: true },
-    { id: "w4", date: "2026-08-23", organization: "Los Angeles Cricket", groupId: "lac", activity: "Outfield irrigation dry-spot survey shared with facility staff", area: "Water & irrigation", hours: 4, volunteers: 2, materials: "", value: 0, verified: true },
-    { id: "w5", date: "2026-08-16", organization: "Basin Youth Soccer Academy", groupId: "ex-youth-soccer", activity: "Portable goal repair and net replacement", area: "Equipment", hours: 5, volunteers: 3, materials: "Two nets", value: 180, verified: false, example: true },
-    { id: "w6", date: "2026-08-09", organization: "Community volunteers", groupId: null, activity: "Bleacher cleaning and graffiti removal at the diamond cluster", area: "Seating & shade", hours: 12, volunteers: 8, materials: "Cleaner, rollers", value: 90, verified: true }
+    { id: "w1", date: "2026-09-12", organization: "Los Angeles Cricket", groupId: "lac", activity: "Cricket pitch mowing, rolling and crease re-marking", area: "Fields & turf", hours: 14, volunteers: 5, materials: "Line paint, fuel", verified: true },
+    { id: "w2", date: "2026-09-06", organization: "Valley Evening Softball League", groupId: "ex-softball-league", activity: "Infield dragging and base-peg repair, Diamonds 3–4", area: "Fields & turf", hours: 9, volunteers: 4, materials: "Base pegs", verified: true, example: true },
+    { id: "w3", date: "2026-08-30", organization: "Basin Walk & Talk Club", groupId: "ex-walk-club", activity: "Perimeter road litter pickup", area: "Facility updates", hours: 6, volunteers: 6, materials: "Bags, gloves", verified: true, example: true },
+    { id: "w4", date: "2026-08-23", organization: "Los Angeles Cricket", groupId: "lac", activity: "Outfield irrigation dry-spot survey shared with facility staff", area: "Water & irrigation", hours: 4, volunteers: 2, materials: "", verified: true },
+    { id: "w5", date: "2026-08-16", organization: "Basin Youth Soccer Academy", groupId: "ex-youth-soccer", activity: "Portable goal repair and net replacement", area: "Equipment", hours: 5, volunteers: 3, materials: "Two nets", verified: false, example: true },
+    { id: "w6", date: "2026-08-09", organization: "Community volunteers", groupId: null, activity: "Bleacher cleaning and graffiti removal at the diamond cluster", area: "Seating & shade", hours: 12, volunteers: 8, materials: "Cleaner, rollers", verified: true }
   ],
 
   /* ------------------------------------------------------------------
