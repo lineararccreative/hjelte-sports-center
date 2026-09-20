@@ -431,7 +431,7 @@ window.HJELTE = {
   membership: {
     memberTypes: ["Individual", "Community group", "Permitted organization", "Business"],
     interests: [
-      { id: "Monthly maintenance", label: "Monthly maintenance", note: "$10 per person per month from your group, toward the upkeep the City does not cover." },
+      { id: "Monthly maintenance", label: "Monthly maintenance", note: "$10.50 per person per month from your group — $10 toward upkeep plus 5% for administration and processing." },
       { id: "One-time project support", label: "One-time project support", note: "Put something toward a specific project on the list." },
       { id: "Volunteer time", label: "Volunteer time", note: "Work days, field prep, cleanups, setting up for events." },
       { id: "Materials or equipment", label: "Materials or equipment", note: "Paint, nets, tools, water, shade, anything the list needs." }
@@ -445,11 +445,14 @@ window.HJELTE = {
     /* Monthly maintenance is priced per person: the group's headcount, taken
        at intake and editable by an admin, times this rate. */
     monthlyPerPerson: 10,
+    /* 5% for administration and processing, added on top of the maintenance
+       rate rather than taken out of it. */
+    adminPct: 5,
     /* Stripe Payment Links (live, Los Angeles Cricket account). Card details
        never touch this site; the project dropdown on Stripe's page becomes
        the memo on the contribution. */
     stripe: {
-      monthly: "https://buy.stripe.com/00w9ATg1fdC12ka4T9abK00",
+      monthly: "https://buy.stripe.com/fZuaEXeXb0Pf5wmgBRabK02",
       oneTime: "https://buy.stripe.com/dRm4gzdT70Pf0c20CTabK01"
     }
   },

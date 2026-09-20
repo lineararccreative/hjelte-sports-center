@@ -883,7 +883,7 @@
     updateRate();
 
     const pay = [
-      { key: "monthly", title: "Monthly maintenance", text: `$${D.membership.monthlyPerPerson} per person per month from your group, toward the upkeep the City does not cover — mowing help, materials, small repairs.`, cta: "Set up a monthly contribution", icon: "hands" },
+      { key: "monthly", title: "Monthly maintenance", text: `$${(D.membership.monthlyPerPerson * (1 + (D.membership.adminPct || 0) / 100)).toFixed(2)} per person per month — $${D.membership.monthlyPerPerson} toward the upkeep the City does not cover, plus ${D.membership.adminPct}% for administration and processing.`, cta: "Set up a monthly contribution", icon: "hands" },
       { key: "oneTime", title: "One-time toward a project", text: "Choose your own amount and pick the project it goes to — restrooms, irrigation, signage, or wherever it is needed most. That choice travels with the contribution.", cta: "Make a one-time contribution", icon: "target" }
     ];
     $("#payGrid").innerHTML = pay.map((o) => {
@@ -902,12 +902,15 @@
   /* $10 a head, shown as it is entered so nobody is surprised at checkout */
   function updateRate() {
     const note = $("#rateNote"); if (!note) return;
-    const rate = Number((D.membership || {}).monthlyPerPerson || 0);
+    const M = D.membership || {};
+    const rate = Number(M.monthlyPerPerson || 0), pct = Number(M.adminPct || 0);
+    const each = rate * (1 + pct / 100);
+    const usd = (v) => "$" + (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, "");
     const input = $("#memberSizeWrap input");
     const n = input && !$("#memberSizeWrap").hidden ? Math.max(0, Math.round(Number(input.value) || 0)) : 0;
     note.innerHTML = n
-      ? `<p><b>${n} ${n === 1 ? I18.t("person") : I18.t("people")} × $${rate} = $${n * rate} ${I18.t("per month")}</b> ${I18.t("for your group. An admin can change your headcount at any time and the amount follows it.")}</p>`
-      : `<p>${I18.t("Monthly maintenance is")} <b>$${rate} ${I18.t("per person, per month")}</b> — ${I18.t("a group of 18 contributes")} $${18 * rate} ${I18.t("a month. Individuals contribute as one person.")}</p>`;
+      ? `<p><b>${n} ${n === 1 ? I18.t("person") : I18.t("people")} × ${usd(each)} = ${usd(n * each)} ${I18.t("per month")}</b> — ${usd(n * rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing. An admin can change your headcount at any time and the amount follows it.")}</p>`
+      : `<p>${I18.t("Monthly maintenance is")} <b>${usd(each)} ${I18.t("per person, per month")}</b> — ${usd(rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing.")}</p>`;
   }
 
   /* the member form: same spam controls as the group form */
