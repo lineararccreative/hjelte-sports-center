@@ -752,22 +752,13 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .sub-sports .sub-all { grid-column: 1 / -1; padding-bottom: 6px; border-bottom: 1px solid var(--line); margin-bottom: 4px; }
 .sub-sports input { accent-color: var(--grass); width: 16px; height: 16px; }
 
-/* ---------- Permit badges & roster ---------- */
+/* ---------- Permit badges ---------- */
 .badge.permit { border-color: transparent; }
 .badge.permit-permitted { background: var(--grass); color: #fff; }
 .badge.permit-none { background: #F3E3E0; color: #8A3B2E; }
 .badge.permit-unknown { background: var(--off-2); color: var(--ink-3); }
 .badge.permit-paid { background: var(--gold-light); color: var(--gold-dark); }
-.roster { margin-top: 12px; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
-.roster-table { width: 100%; border-collapse: collapse; font-size: .88rem; min-width: 760px; }
-.roster-table th { text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 12px 14px; border-bottom: 1px solid var(--line); background: var(--off); }
-.roster-table td { padding: 12px 14px; border-bottom: 1px solid var(--off-2); vertical-align: middle; }
-.roster-table tr:last-child td { border-bottom: 0; }
-.roster-table td .dot { margin-right: 4px; }
-.roster-table td a { color: var(--ink-3); display: inline-block; margin-right: 6px; }
-.roster-table .i { width: 16px; height: 16px; }
-.roster-table tr.is-sample td { color: var(--muted); }
 
 /* ---------- Stewardship ---------- */
 .stewardship { background: var(--paper); }
@@ -860,7 +851,6 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
      section eyebrows and schedule day heads) ---------- */
 .badge, .status, .tag, .chip-label, .map-card dt, .fact dt, .info-list dt,
 .stats-strip span:last-child, .stats-row span, .filter-bar label,
-.roster-table th, .admin-table th, .pill { text-transform: none; letter-spacing: .01em; }
 .badge, .status, .pill { font-size: .72rem; }
 .tag { font-size: .74rem; }
 .chip-label, .filter-bar label { font-size: .76rem; }

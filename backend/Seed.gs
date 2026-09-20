@@ -1112,7 +1112,7 @@ function applyFootballeros() {
     id: "footballeros", name: "Footballeros", short: "Footballeros", sport: "soccer",
     category: "community", permitStatus: "none", paidPermit: false,
     badges: "COMMUNITY GROUP", programType: "Adult pickup soccer", ages: "Adult",
-    level: "Recreational", participants: "", days: "5,6", times: "Fri\u2013Sat 6:00 \u2013 7:00 PM",
+    level: "Recreational", participants: "", days: "5|6", times: "Fri\u2013Sat 6:00 \u2013 7:00 PM",
     website: "", social: "", socialHandle: "", email: "",
     description: "A neighbourhood pickup crew \u2014 footballeros is Spanish for footballers \u2014 who meet on the west soccer/football area on Friday and Saturday evenings. New players are welcome to join a side.",
     description_es: "", logoUrl: "", status: "approved", example: false, updatedAt: new Date().toISOString()

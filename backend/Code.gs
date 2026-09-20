@@ -459,7 +459,7 @@ function saveGroup(admin, d) {
   if (!existing) {
     requireMaster(admin);
     d = sanitizeGroup(d);
-    const g = Object.assign({ status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: d.id || slug(d.name) || uid(), updatedAt: nowISO() });
+    const g = Object.assign({ status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: slug(d.name) || uid(), updatedAt: nowISO() });
     upsertRow("Groups", "id", g); touch(); return { ok: true, group: g };
   }
   requireGroup(admin, existing.id);
@@ -558,7 +558,7 @@ function approveSubmission(admin, d) {
   const sportId = d.sportId || slug(s.sport);
   const permitted = String(s.permit).toLowerCase() === "yes";
   const g = {
-    id: d.groupId || slug(s.groupName) || uid(), name: s.groupName, short: initials(s.groupName), sport: sportId,
+    id: slug(s.groupName) || uid(), name: s.groupName, short: initials(s.groupName), sport: sportId,
     category: permitted ? "permitted" : "community", permitStatus: permitted ? "permitted" : (String(s.permit).toLowerCase() === "no" ? "none" : "unknown"), paidPermit: permitted,
     badges: permitted ? ["PERMITTED ORGANIZATION"] : ["COMMUNITY GROUP"], programType: s.orgType, ages: s.ages || "Mixed", level: "Recreational",
     days: parseDays(s.days), times: oneLine(s.times, 160), website: cleanUrl(s.website), social: cleanUrl(s.social), socialHandle: "", email: validEmail(s.email) ? s.email : "",

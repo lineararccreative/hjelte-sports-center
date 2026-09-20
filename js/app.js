@@ -161,7 +161,7 @@
   const spy = new IntersectionObserver((entries) => {
     entries.forEach((e) => {
       if (!e.isIntersecting) return;
-      const id = e.target.id === "happening" ? "sports" : e.target.id === "add-group" ? "groups" : e.target.id === "featured" ? "projects" : e.target.id;
+      const id = e.target.id === "add-group" ? "groups" : e.target.id === "featured" ? "projects" : e.target.id;
       navLinks.forEach((a) => a.classList.toggle("is-active", a.getAttribute("href") === "#" + id));
     });
   }, { rootMargin: "-40% 0px -55% 0px" });
@@ -251,7 +251,7 @@
       <h4>Typical activities</h4>
       <div class="sport-tags">${s.activities.map((a) => `<span>${esc(a)}</span>`).join("")}</div>
       <h4>Groups (${gs.length}) · ${weekly} weekly schedule blocks</h4>
-      <div class="modal-groups">${gs.length ? gs.map((g) => `<a href="#groups" data-group="${g.id}"><span class="logo-tile" style="--sport:${s.color}">${esc(g.short)}</span><span><b>${esc(g.name)}</b><small>${esc(g.programType)}</small></span></a>`).join("") : `<p class="fine-print">No groups listed yet for this sport. <a href="#add-group" style="color:var(--grass);font-weight:600">Add yours →</a></p>`}</div>
+      <div class="modal-groups">${gs.length ? gs.map((g) => `<a href="#groups" data-group="${esc(g.id)}"><span class="logo-tile" style="--sport:${s.color}">${esc(g.short)}</span><span><b>${esc(g.name)}</b><small>${esc(g.programType)}</small></span></a>`).join("") : `<p class="fine-print">No groups listed yet for this sport. <a href="#add-group" style="color:var(--grass);font-weight:600">Add yours →</a></p>`}</div>
       <div class="modal-actions">
         <a href="#groups" class="btn btn-primary" data-explore="${id}">Explore Groups</a>
         <a href="#schedule" class="btn btn-outline" data-sched-sport="${id}">See schedule</a>
@@ -385,7 +385,7 @@
         <div><dt class="fine-print" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Category</dt><dd style="margin:0;color:var(--muted);font-size:.9rem">${esc(D.categories[e.category]?.desc || "")}</dd></div>
       </dl>
       <div class="modal-actions">
-        ${g ? `<a href="#groups" class="btn btn-primary" data-group-open="${g.id}">View group</a>` : ""}
+        ${g ? `<a href="#groups" class="btn btn-primary" data-group-open="${esc(g.id)}">View group</a>` : ""}
         <a href="#connect" class="btn btn-outline" data-topic="Schedule update" data-msg="Schedule update for: ${esc(titleOf(e))} (${DAYS[e.day]} ${fmtRange(e.start, e.end)}, ${esc(f ? f.name : "")}).%0A%0AWhat changed:%0A">Report a change</a>
       </div></div>`);
     const go = $("[data-group-open]", modalBody); if (go) go.addEventListener("click", () => { $("#groupSearch").value = g.name; dir.q = g.name.toLowerCase(); renderGroups(); closeModal(); });
@@ -429,7 +429,7 @@
     const mail = safeMail(g.email);
     const contactHref = mail ? `mailto:${encodeURIComponent(mail)}?subject=${encodeURIComponent("Hello from the Hjelte community hub")}` : mailto(`Contact request: ${g.name}`, `I'd like to get in touch with ${g.name} (listed on the Hjelte Sports Center hub).\n\nMy message:\n`);
     const site = safeUrl(g.website), social = safeUrl(g.social);
-    return `<article class="group-card" style="${sportStyle(g.sport)}" data-id="${g.id}">
+    return `<article class="group-card" style="${sportStyle(g.sport)}" data-id="${esc(g.id)}">
       ${g.example ? '<span class="tag tag-example sample-tag" title="Placeholder listing to be replaced with a real group">Sample</span>' : ""}
       <div class="group-top">
         <div class="logo-tile">${safeUrl(g.logoUrl || g.logo) ? `<img src="${esc(safeUrl(g.logoUrl || g.logo))}" alt="" loading="lazy">` : esc(g.short)}</div>
@@ -478,7 +478,10 @@
     });
   }
   function markFieldError(form, f) {
-    const lbl = f.closest("label") || f.closest("fieldset") || f.parentElement;
+    // A radio or checkbox group shares one name, so its message belongs on the
+    // fieldset rather than inside whichever single option was visited first.
+    const grouped = f.type === "radio" || f.type === "checkbox";
+    const lbl = (grouped && f.closest("fieldset")) || f.closest("label") || f.closest("fieldset") || f.parentElement;
     const id = `${form.id || "form"}-${f.name || "f"}-err`;
     if (!document.getElementById(id)) {
       lbl.insertAdjacentHTML("beforeend", `<span class="field-error" id="${id}">${esc(f.validationMessage)}</span>`);
@@ -638,7 +641,6 @@
     });
     $("#mapChips").innerHTML = D.mapLocations.map((l) => `<button class="chip" data-loc="${l.id}">${l.sport ? `<i class="dot" style="background:${sport(l.sport).color}"></i>` : ""}${esc(l.name)}</button>`).join("");
     $$("#mapChips .chip").forEach((c) => c.addEventListener("click", () => selectLocation(c.dataset.loc)));
-    $$(".map-modes .mode-btn").forEach((b) => b.addEventListener("click", () => setMapMode(b.dataset.mode)));
   }
 
   /* Which areas stay open while a given sport has the field. The protected
@@ -648,6 +650,9 @@
     cricket: "Cricket has the 420 ft circle. All four diamonds stay open, and so do the parts of the soccer/football areas that fall outside the boundary — the shaded portions are not available, and play should never run alongside or across the circle.",
     diamonds: "The diamonds are in use. The cricket ground and all four soccer/football areas stay open; keep clear of the ground behind each backstop and watch for foul balls."
   };
+  // The mode buttons are static markup, so they are bound once here rather
+  // than inside renderMap(), which now re-runs on every breakpoint crossing.
+  $$(".map-modes .mode-btn").forEach((b) => b.addEventListener("click", () => setMapMode(b.dataset.mode)));
   function setMapMode(mode) {
     const svg = $("#facilitySvg");
     if (!svg || !MAP_MODES[mode]) return;
@@ -903,6 +908,7 @@
   const GENERAL_PROJECT = "General maintenance — where it is needed most";
   const NO_GROUP = "Myself — not for a group";
   // client_reference_id accepts letters, digits, "-" and "_" only, up to 200.
+  const cssEsc = (v) => (window.CSS && CSS.escape ? CSS.escape(String(v)) : String(v).replace(/["\\]/g, "\\$&"));
   const refToken = (s) => String(s || "").trim().replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 90) || "Unspecified";
 
   function payProjects() {
@@ -920,17 +926,24 @@
       payProjects().map((p) => `<option value="${esc(p.id)}">${esc(p.title)}</option>`).join("");
     gs.innerHTML = `<option value="">${esc(NO_GROUP)}</option>` +
       payGroups().map((g) => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join("");
-    if (keepP) ps.value = keepP;
-    if (keepG) gs.value = keepG;
+    // Live sheet data can retire a project or a group mid-session. Only restore
+    // a kept choice if the rebuilt list still offers it, otherwise the select
+    // would land on selectedIndex -1 and silently disagree with the memo.
+    ps.value = keepP && ps.querySelector(`option[value="${cssEsc(keepP)}"]`) ? keepP : "";
+    gs.value = keepG && gs.querySelector(`option[value="${cssEsc(keepG)}"]`) ? keepG : "";
     updatePayMemo();
   }
   function updatePayMemo() {
     const ps = $("#payProject"), gs = $("#payGroup");
     if (!ps || !gs) return;
-    const proj = ps.options[ps.selectedIndex], grp = gs.options[gs.selectedIndex];
-    const projLabel = proj ? proj.textContent : GENERAL_PROJECT;
-    const grpLabel = grp ? grp.textContent : NO_GROUP;
-    const ref = `${refToken(projLabel)}--for--${refToken(grpLabel)}`.slice(0, 200);
+    const proj = payProjects().find((p) => p.id === ps.value);
+    const grp = payGroups().find((g) => g.id === gs.value);
+    const projLabel = proj ? proj.title : GENERAL_PROJECT;
+    const grpLabel = grp ? grp.name : NO_GROUP;
+    // Titles are free text an admin edits, so a stable id is appended where one
+    // exists; two similarly named rows stay distinguishable in Stripe's exports.
+    const part = (label, rec) => refToken(label) + (rec && rec.id ? "-" + refToken(rec.id).slice(0, 24) : "");
+    const ref = `${part(projLabel, proj)}--for--${part(grpLabel, grp)}`.slice(0, 200);
     $$("#payGrid [data-pay]").forEach((a) => {
       const base = safeUrl((D.membership.stripe || {})[a.dataset.pay]);
       if (!base) return;
