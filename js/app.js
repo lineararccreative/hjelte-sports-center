@@ -892,12 +892,14 @@
         <fieldset class="amt-row">
           <legend class="sr-only">${esc(I18.t("Amount"))}</legend>
           ${PAY_PRESETS.map((v, i) => `<label><input type="radio" name="payAmt" value="${v}"${i === 1 ? " checked" : ""}> ${esc(usd(v))}</label>`).join("")}
+          <label id="payMonthOpt" hidden><input type="radio" name="payAmt" value="month"> <span id="payMonthOptLabel"></span></label>
           <label><input type="radio" name="payAmt" value="other"> ${esc(I18.t("Other"))}</label>
           <span class="amt-other"><span aria-hidden="true">$</span><input type="number" id="payAmtOther" min="${PAY_MIN}" max="${PAY_MAX}" step="1" inputmode="decimal" aria-label="${esc(I18.t("Other amount, in dollars"))}" disabled></span>
         </fieldset>
         <button class="btn btn-primary btn-sm" type="button" data-checkout="payment">${esc(I18.t("Make a one-time contribution"))}</button>
       </article>
-      <p class="pay-status" id="payStatus" role="status" aria-live="polite"></p>`;
+      <p class="pay-status" id="payStatus" role="status" aria-live="polite"></p>
+      ${safeUrl(M.manageUrl) ? `<p class="pay-manage">${esc(I18.t("Already contributing monthly?"))} <a href="${esc(safeUrl(M.manageUrl))}" target="_blank" rel="noopener">${esc(I18.t("Manage or cancel your contribution"))}<span class="sr-only"> ${esc(I18.t("(opens Stripe in a new tab)"))}</span></a></p>` : ""}`;
     bindPayGrid();
     renderPayPicker();
   }
@@ -918,7 +920,7 @@
   const PAY_PRESETS = [25, 50, 100];
   const PAY_MIN = 5, PAY_MAX = 5000;   // mirrors the backend's own limits
   const usd = (v) => "$" + (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, "");
-  let payRef = "", payBusy = false;
+  let payRef = "", payBusy = false, payMonthAmount = 0;
 
   /* Bound once on the container, which survives every re-render of the cards. */
   function bindPayGrid() {
@@ -939,7 +941,10 @@
       const data = { mode, ref: payRef, projectId: $("#payProject").value || "", groupId: $("#payGroup").value || "" };
       if (mode === "payment") {
         const picked = $$('#payGrid [name="payAmt"]').find((r) => r.checked);
-        const dollars = picked && picked.value === "other" ? Number($("#payAmtOther").value) : Number(picked && picked.value);
+        const dollars = !picked ? NaN
+          : picked.value === "other" ? Number($("#payAmtOther").value)
+          : picked.value === "month" ? payMonthAmount
+          : Number(picked.value);
         if (!(dollars >= PAY_MIN) || dollars > PAY_MAX) {
           say(`${I18.t("Enter an amount between")} ${usd(PAY_MIN)} ${I18.t("and")} ${usd(PAY_MAX)}.`, true);
           const o = $("#payAmtOther"); if (o && !o.disabled) o.focus();
@@ -1018,6 +1023,26 @@
           : esc(I18.t("That group has no headcount on file yet, so a monthly amount cannot be worked out."));
     }
     if (btn) btn.disabled = !(grp && n > 0);
+
+    // A month's worth, paid once. Same arithmetic as the subscription, but
+    // nothing recurring and nothing to cancel. Hidden when there is no group,
+    // no headcount, or the total is past what one payment may be.
+    payMonthAmount = grp && n > 0 ? Math.round(n * each * 100) / 100 : 0;
+    const opt = $("#payMonthOpt"), lbl = $("#payMonthOptLabel");
+    if (opt && lbl) {
+      const offer = payMonthAmount >= PAY_MIN && payMonthAmount <= PAY_MAX;
+      opt.hidden = !offer;
+      if (offer) lbl.textContent = `${I18.t("Cover one month")} — ${usd(payMonthAmount)}`;
+      const radio = opt.querySelector("input");
+      // If the group changes and this option goes away while chosen, fall back
+      // to a preset rather than leaving nothing selected.
+      if (!offer && radio.checked) {
+        radio.checked = false;
+        const back = $$('#payGrid [name="payAmt"]').find((r) => r.value === String(PAY_PRESETS[1]));
+        if (back) back.checked = true;
+        const other = $("#payAmtOther"); if (other) { other.disabled = true; other.value = ""; }
+      }
+    }
   }
 
   function syncMemberType(clearSize) {

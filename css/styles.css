@@ -1054,6 +1054,9 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
 .pay-card .btn[disabled] { opacity: .55; cursor: not-allowed; }
 .pay-status { grid-column: 1 / -1; margin: 0; font-size: .88rem; color: var(--muted); min-height: 1.2em; }
 .pay-status.is-bad { color: #8A3B2E; font-weight: 600; }
+/* Cancelling has to be as easy to find as signing up. */
+.pay-manage { grid-column: 1 / -1; margin: 6px 0 0; font-size: .88rem; color: var(--muted); }
+.pay-manage a { color: var(--grass-dark); text-decoration: underline; text-underline-offset: 2px; }
 
 /* =====================================================================
    Facility map on a phone

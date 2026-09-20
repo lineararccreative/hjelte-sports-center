@@ -480,6 +480,11 @@ window.HJELTE = {
     /* Stripe Payment Links (live, Los Angeles Cricket account). Card details
        never touch this site; the project dropdown on Stripe's page becomes
        the memo on the contribution. */
+    /* Stripe's hosted customer portal. Someone who set up a monthly
+       contribution enters their email here, Stripe sends them a login link,
+       and they can cancel or change their card without going through anyone.
+       A public link by design — it is meant to sit on the site. */
+    manageUrl: "https://billing.stripe.com/p/login/7sYaEX9BneeKaqB2iCeUU00",
     /* Hjelte Community Hub Stripe account, separate from Los Angeles Cricket. */
     stripe: {
       monthly: "https://buy.stripe.com/7sYaEX9BneeKaqB2iCeUU00",
