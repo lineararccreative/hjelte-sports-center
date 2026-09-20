@@ -225,7 +225,13 @@
   function openDrawer(title, fields, save) {
     drawerLastFocus = document.activeElement;
     $("#drawerTitle").textContent = title;
-    $("#drawerForm").innerHTML = fields;
+    // Every duplicate opens through drawerTitle(), which runs while this
+    // call's arguments are being evaluated — so the flag is always set before
+    // we read it here, and we clear it so the next drawer starts clean.
+    const dup = drawerIsDup; drawerIsDup = false;
+    $("#drawerForm").innerHTML = (dup
+      ? '<p class="panel-note span-2">Saving creates a <b>new</b> record. The fields below are copied from the one you duplicated — the original is left as it is.</p>'
+      : "") + fields;
     $("#drawerStatus").textContent = "";
     onSave = save; drawer.hidden = false;
     document.addEventListener("keydown", trapDrawer);
@@ -261,7 +267,8 @@
   /* Duplicating opens the editor on an existing record's values but saves it as
      a new one: a blank id makes the backend mint a fresh one. */
   const newId = (id, dup) => (dup ? "" : (id || ""));
-  const drawerTitle = (id, dup, noun, addLabel) => (dup ? "Duplicate " + noun : id ? "Edit " + noun : addLabel);
+  let drawerIsDup = false;
+  const drawerTitle = (id, dup, noun, addLabel) => { drawerIsDup = !!dup; return dup ? "Duplicate " + noun : id ? "Edit " + noun : addLabel; };
   const ACTIONS = {
     dupSchedule: (id) => ACTIONS.editSchedule(id, true),
     dupEvent: (id) => ACTIONS.editEvent(id, true),
@@ -333,8 +340,10 @@
     editGroup: (id, dup) => {
       const g = id ? myGroups().find((x) => x.id === id) || {} : {};
       const dayChecks = `<fieldset class="span-2"><legend>Typical days</legend><div class="check-row">${DAYS.map((d, i) => `<label><input type="checkbox" name="days" data-multi="1" value="${i}"${(g.days || []).indexOf(i) !== -1 ? " checked" : ""}> ${DAYS_S[i]}</label>`).join("")}</div></fieldset>`;
-      // A new group's id is the slug of its name, so a duplicate keeps the
-      // original name it would overwrite the row it was copied from.
+      // A new group's id comes from its name, so a duplicate saved under the
+      // original name would land next to it as "<slug>-2" (the backend keeps
+      // ids unique). Pre-fill "(copy)" so the directory doesn't get two rows
+      // with the same title by accident.
       const gName = dup ? (g.name ? g.name + " (copy)" : "") : g.name;
       openDrawer(drawerTitle(id, dup, "group", "Add group"),
         field("Name", "name", gName) + field("Short code", "short", g.short, "text", "2–3 letters for the logo tile") +

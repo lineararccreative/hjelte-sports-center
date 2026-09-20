@@ -463,7 +463,7 @@ function saveGroup(admin, d) {
   if (!existing) {
     requireMaster(admin);
     d = sanitizeGroup(d);
-    const g = Object.assign({ status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: slug(d.name) || uid(), updatedAt: nowISO() });
+    const g = Object.assign({ status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: freshGroupId(d.name), updatedAt: nowISO() });
     upsertRow("Groups", "id", g); touch(); return { ok: true, group: g };
   }
   requireGroup(admin, existing.id);
@@ -559,10 +559,14 @@ function approveSubmission(admin, d) {
   requireMaster(admin);
   const s = rows("Submissions").find((x) => x.id === d.id);
   if (!s) throw new Error("Submission not found");
+  // freshGroupId mints a new row every call, so approving twice would list the
+  // group twice. The UI only offers Approve on a pending row; this guards the
+  // endpoint itself.
+  if (String(s.status).toLowerCase() !== "pending") throw new Error("That submission has already been " + String(s.status) + ".");
   const sportId = d.sportId || slug(s.sport);
   const permitted = String(s.permit).toLowerCase() === "yes";
   const g = {
-    id: slug(s.groupName) || uid(), name: s.groupName, short: initials(s.groupName), sport: sportId,
+    id: freshGroupId(s.groupName), name: s.groupName, short: initials(s.groupName), sport: sportId,
     category: permitted ? "permitted" : "community", permitStatus: permitted ? "permitted" : (String(s.permit).toLowerCase() === "no" ? "none" : "unknown"), paidPermit: permitted,
     badges: permitted ? ["PERMITTED ORGANIZATION"] : ["COMMUNITY GROUP"], programType: s.orgType, ages: s.ages || "Mixed", level: "Recreational",
     days: parseDays(s.days), times: oneLine(s.times, 160), website: cleanUrl(s.website), social: cleanUrl(s.social), socialHandle: "", email: validEmail(s.email) ? s.email : "",
@@ -661,6 +665,18 @@ function sendDailyDigest(force) {
 
 /* ---------------------------------------------------------------- utils */
 function slug(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""); }
+/* A new group's id is the slug of its name, and upsertRow replaces any row
+   that already carries that id. Two groups named the same — a duplicated row
+   saved without renaming, or a public submission named after a group already
+   in the directory — would otherwise have the second silently overwrite the
+   first, contact email and all. Suffix until the id is free. */
+function freshGroupId(name) {
+  const base = slug(name) || uid();
+  const taken = rows("Groups").map((g) => String(g.id));
+  if (taken.indexOf(base) === -1) return base;
+  for (var n = 2; n < 200; n++) if (taken.indexOf(base + "-" + n) === -1) return base + "-" + n;
+  return base + "-" + uid();
+}
 function initials(s) { return String(s || "").split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase(); }
 function parseDays(s) {
   const map = { sun: 0, mon: 1, tue: 2, wed: 3, thu: 4, fri: 5, sat: 6 };

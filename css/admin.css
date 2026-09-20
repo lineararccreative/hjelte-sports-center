@@ -15,7 +15,13 @@
   background: var(--off, #F6F5F1); box-shadow: 0 1px 0 var(--line), 0 6px 12px -10px rgba(20,22,24,.5); }
 .admin-tabs::after { content: ""; position: absolute; inset: 0 -100vw; z-index: -1;
   background: inherit; box-shadow: inherit; }
-@media (max-width: 599.98px) { .admin-tabs { top: 56px; } }
+/* The header and the frozen tab strip together cover the top ~130px. The
+   scroll-padding-top in styles.css clears only the header, so an anchor jump
+   or a focused row button landed underneath the tabs (WCAG 2.2 SC 2.4.11,
+   Focus Not Obscured). admin.css loads after styles.css, so this wins.
+   --header-h has no mobile override, so the strip sits at 64px everywhere and
+   the old `top: 56px` phone rule just tucked it 9px under the header. */
+html { scroll-padding-top: calc(var(--header-h) + 78px); }
 .admin-tabs button { padding: 10px 14px; border-radius: 999px; font-weight: 600; font-size: .9rem; color: var(--muted); white-space: nowrap; background: #fff; border: 1px solid var(--line); display: inline-flex; gap: 8px; align-items: center; }
 .admin-tabs button.is-active { background: var(--ink); color: #fff; border-color: var(--ink); }
 .admin-tabs button .n { background: var(--gold); color: var(--ink); font-size: .68rem; padding: 1px 6px; border-radius: 999px; font-weight: 700; }
@@ -72,4 +78,7 @@
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* table headers stay put while a long list scrolls */
-.admin-table thead th { position: sticky; top: 0; background: #fff; z-index: 1; }
+/* No sticky thead here: .admin-table-wrap needs overflow-x for the 720px
+   min-width table, and a scroll container with one axis auto computes the
+   other to auto too, so the header would stick to a box that never scrolls
+   vertically. The frozen page header and tab strip are the navigation. */
