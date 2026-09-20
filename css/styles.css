@@ -1115,3 +1115,14 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
 
 /* the sideways scrollers are reachable by keyboard, so show where focus lands */
 #weekGrid:focus-visible, .map-chips:focus-visible { outline: 3px solid var(--gold-dark); outline-offset: 3px; border-radius: 12px; }
+
+/* Contribution memo picker: project and group, both admin-maintained lists */
+.pay-picker { display: grid; gap: 14px; margin: 4px 0 10px; }
+@media (min-width: 560px) { .pay-picker { grid-template-columns: 1fr 1fr; } }
+.pay-picker label { display: grid; gap: 6px; min-width: 0; }
+.pay-picker label > span { font-size: .78rem; font-weight: 600; color: var(--ink-3); }
+.pay-picker select { width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; font: inherit;
+  font-size: .95rem; color: var(--ink); background: #fff; border: 1px solid var(--line);
+  border-radius: 12px; }
+.pay-picker select:focus-visible { outline: 3px solid var(--gold-dark); outline-offset: 2px; }
+.pay-memo { margin: 0 0 18px; font-size: .86rem; color: var(--muted); line-height: 1.5; }

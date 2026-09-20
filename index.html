@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/img/hero-aerial.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="css/styles.css?v=2026-09-19q">
+  <link rel="stylesheet" href="css/styles.css?v=2026-09-19r">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -722,7 +722,17 @@
     <div class="member-step contribute-step reveal" id="contributeStep">
       <p class="step-mark"><span>2</span> Contribute</p>
       <h3>Chip in when you're ready</h3>
-      <p class="step-lead">Contributions are handled on Stripe's own secure page — card details never touch this site. You pick the amount there, the project it goes to, and who it is for: yourself, a community or independent group, a permitted organization or a business. Anyone can contribute for any group at Hjelte — a permit is not required.</p>
+      <p class="step-lead">Pick the project and the group below, then choose your amount on Stripe's own secure page — card details never touch this site. Anyone can contribute for any group at Hjelte; a permit is not required. Both choices travel with the payment as its memo.</p>
+      <div class="pay-picker">
+        <label><span>Put this toward</span>
+          <select id="payProject" aria-describedby="payMemo"></select>
+        </label>
+        <label><span>Contributing for</span>
+          <select id="payGroup" aria-describedby="payMemo"></select>
+        </label>
+      </div>
+      <p class="pay-memo" id="payMemo" role="status" aria-live="polite"></p>
+
       <div class="pay-grid" id="payGrid"></div>
       <div class="rate-note" id="rateNote" role="status" aria-live="polite"></div>
       <p class="fine-print">Hjelte community members administer community contributions for Hjelte projects and upkeep. A 5% share of each contribution covers administration and processing; the rest goes to the fields. Contributions are not payments to the City of Los Angeles and do not grant permit status or exclusive use of any field.</p>
@@ -820,8 +830,8 @@
 
 <button class="to-top" id="toTop" aria-label="Back to top">↑</button>
 
-<script src="js/data.js?v=2026-09-19q"></script>
-<script src="js/i18n.js?v=2026-09-19q"></script>
-<script src="js/app.js?v=2026-09-19q"></script>
+<script src="js/data.js?v=2026-09-19r"></script>
+<script src="js/i18n.js?v=2026-09-19r"></script>
+<script src="js/app.js?v=2026-09-19r"></script>
 </body>
 </html>

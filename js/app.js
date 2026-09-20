@@ -934,10 +934,62 @@
         <h4>${esc(o.title)}</h4>
         <p>${esc(o.text)}</p>
         ${url
-          ? `<a class="btn btn-primary btn-sm" href="${esc(url)}" target="_blank" rel="noopener">${esc(o.cta)}<span class="sr-only"> (opens Stripe in a new tab)</span></a>`
+          ? `<a class="btn btn-primary btn-sm" data-pay="${esc(o.key)}" href="${esc(url)}" target="_blank" rel="noopener">${esc(o.cta)}<span class="sr-only"> (opens Stripe in a new tab)</span></a>`
           : `<p class="pay-pending">${I18.t("Opening soon — join the list above and we'll email you the moment contributions open.")}</p>`}
       </article>`;
     }).join("");
+    renderPayPicker();
+  }
+
+  /* ------------------------------------------------------------------
+     Contribution memo
+     ------------------------------------------------------------------
+     Both lists are maintained by an admin in the same place as everything
+     else: Projects in the projects editor, groups in the Who Uses Hjelte
+     directory. A Stripe payment link's own dropdowns are fixed at publish
+     time, so the two choices are made here instead and travel to Stripe on
+     the link as client_reference_id, which shows on the payment and in
+     exports. Anyone may contribute for any group; holding a permit is not
+     part of it.
+     ------------------------------------------------------------------ */
+  const GENERAL_PROJECT = "General maintenance — where it is needed most";
+  const NO_GROUP = "Myself — not for a group";
+  // client_reference_id accepts letters, digits, "-" and "_" only, up to 200.
+  const refToken = (s) => String(s || "").trim().replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 90) || "Unspecified";
+
+  function payProjects() {
+    // A finished project cannot take new money, so it is left off the list.
+    return (D.projects || []).filter((p) => !isSample(p) && String(p.status || "").toUpperCase() !== "COMPLETED");
+  }
+  function payGroups() {
+    return (D.groups || []).filter((g) => !isSample(g) && g.name);
+  }
+  function renderPayPicker() {
+    const ps = $("#payProject"), gs = $("#payGroup");
+    if (!ps || !gs) return;
+    const keepP = ps.value, keepG = gs.value;
+    ps.innerHTML = `<option value="">${esc(GENERAL_PROJECT)}</option>` +
+      payProjects().map((p) => `<option value="${esc(p.id)}">${esc(p.title)}</option>`).join("");
+    gs.innerHTML = `<option value="">${esc(NO_GROUP)}</option>` +
+      payGroups().map((g) => `<option value="${esc(g.id)}">${esc(g.name)}</option>`).join("");
+    if (keepP) ps.value = keepP;
+    if (keepG) gs.value = keepG;
+    updatePayMemo();
+  }
+  function updatePayMemo() {
+    const ps = $("#payProject"), gs = $("#payGroup");
+    if (!ps || !gs) return;
+    const proj = ps.options[ps.selectedIndex], grp = gs.options[gs.selectedIndex];
+    const projLabel = proj ? proj.textContent : GENERAL_PROJECT;
+    const grpLabel = grp ? grp.textContent : NO_GROUP;
+    const ref = `${refToken(projLabel)}--for--${refToken(grpLabel)}`.slice(0, 200);
+    $$("#payGrid [data-pay]").forEach((a) => {
+      const base = safeUrl((D.membership.stripe || {})[a.dataset.pay]);
+      if (!base) return;
+      a.href = base + (base.indexOf("?") > -1 ? "&" : "?") + "client_reference_id=" + encodeURIComponent(ref);
+    });
+    const note = $("#payMemo");
+    if (note) note.textContent = `${I18.t("Memo on your contribution:")} ${projLabel} · ${grpLabel}`;
   }
 
   function syncMemberType(clearSize) {
@@ -982,6 +1034,9 @@
     newMemberCaptcha();
     $("#memberType").addEventListener("change", () => syncMemberType(true));
     $("#memberSizeWrap input").addEventListener("input", updateRate);
+    ["#payProject", "#payGroup"].forEach((sel) => {
+      const el = $(sel); if (el) el.addEventListener("change", updatePayMemo);
+    });
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       clearFieldErrors(form);
