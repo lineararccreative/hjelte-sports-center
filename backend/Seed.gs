@@ -1107,6 +1107,7 @@ function applyProjects() {
    --------------------------------------------------------------------- */
 function applyContentUpdates() {
   applyProjects();
+  ensureSheet_("Members");
 
   const g = rows("Groups").filter(function (r) { return r.id === "lac"; })[0];
   if (!g) { Logger.log("No lac row in Groups — skipped the group update."); return; }
@@ -1117,4 +1118,18 @@ function applyContentUpdates() {
   upsertRow("Groups", "id", g);
   touch();
   Logger.log("Content updated: projects replaced and the Los Angeles Cricket row refreshed.");
+}
+
+
+/* Create a sheet that setup() did not exist to make yet, with its header row. */
+function ensureSheet_(name) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sh = ss.getSheetByName(name);
+  if (!sh) sh = ss.insertSheet(name);
+  if (sh.getLastRow() === 0) {
+    sh.appendRow(SCHEMA[name]);
+    sh.setFrozenRows(1);
+    sh.getRange(1, 1, 1, SCHEMA[name].length).setFontWeight("bold").setBackground("#E4EFE7");
+  }
+  return sh;
 }

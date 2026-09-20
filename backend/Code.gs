@@ -37,10 +37,11 @@ const SCHEMA = {
   WorkLog: ["id", "date", "organization", "groupId", "activity", "area", "hours", "volunteers", "materials", "value", "verified", "addedBy", "createdAt"],
   Admins: ["email", "role", "groupIds", "name", "addedBy", "addedAt"],
   Submissions: ["id", "createdAt", "groupName", "sport", "orgType", "contact", "email", "phone", "website", "social", "days", "times", "participants", "ages", "description", "permit", "status"],
+  Members: ["id", "createdAt", "name", "email", "phone", "memberType", "groupName", "interests", "notes", "status", "updatedAt"],
   Auth: ["email", "code", "codeExpires", "attempts", "token", "tokenExpires"],
   Meta: ["key", "value"]
 };
-const LIST_FIELDS = { badges: 1, days: 1, partners: 1, sports: 1, groupIds: 1 };
+const LIST_FIELDS = { badges: 1, days: 1, partners: 1, sports: 1, groupIds: 1, interests: 1 };
 const BOOL_FIELDS = { paidPermit: 1, example: 1, confirmed: 1, verified: 1 };
 const NUM_FIELDS = { day: 1, goal: 1, raised: 1, hours: 1, volunteers: 1, attempts: 1, participants: 1 };
 // Sheets silently converts "09:00" into a time value and "2026-09-19" into a
@@ -164,6 +165,15 @@ function withLock(fn) {
 /* ------------------------------------------------------- validation utils */
 const EMAIL_RE = /^[^@\s<>"']+@[^@\s<>"']+\.[^@\s<>"']+$/;
 function validEmail(e) { return EMAIL_RE.test(String(e || "").trim()); }
+/* Members sign up with both an email and a phone, so the hub can reach them
+   either way and either can identify them at sign-in later. Keep the digits,
+   keep a leading +, and require enough of them to be a real number. */
+function cleanPhone(p) {
+  const raw = String(p || "").trim();
+  const plus = raw.charAt(0) === "+" ? "+" : "";
+  const digits = raw.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15 ? plus + digits : "";
+}
 function cleanUrl(u) { const v = String(u || "").trim(); return /^https?:\/\//i.test(v) ? v.slice(0, 300) : ""; }
 function oneLine(s, max) { return String(s || "").replace(/[\r\n]+/g, " ").slice(0, max || 200); }
 // Small fixed-window throttle. Apps Script gives us no client IP, so the key is
@@ -231,6 +241,69 @@ function publicData() {
 }
 
 /* ----------------------------------------------------------------- POST */
+/* ---------------------------------------------------------------------
+   Community membership
+   Anyone who uses the park can join: a permitted organization, a community
+   or independent group, or a neighbour on their own. Email and phone are
+   both required — two ways to reach a member, and later two ways to sign in.
+   --------------------------------------------------------------------- */
+const MEMBER_TYPES = ["Individual", "Community group", "Permitted organization", "Business"];
+const MEMBER_INTERESTS = ["Monthly maintenance", "One-time project support", "Volunteer time", "Materials or equipment"];
+
+function joinCommunity(d) {
+  // a bot filled the hidden field, or came back faster than a person can type
+  if (String(d.website2 || "").trim()) return { ok: true };
+  const elapsed = Date.now() - Number(d.formTs || 0);
+  if (d.formTs && elapsed < 3000) return { ok: true };
+
+  throttleGlobal("join", 60);
+  const email = String(d.email || "").trim().toLowerCase();
+  const phone = cleanPhone(d.phone);
+  if (!validEmail(email)) throw new Error("Please enter a valid email address.");
+  if (!phone) throw new Error("Please enter a valid phone number so we can reach you.");
+  const name = oneLine(d.name, 120);
+  if (!name) throw new Error("Please enter your name.");
+  throttle("join:" + email, 3, 3600);
+
+  const type = MEMBER_TYPES.indexOf(String(d.memberType)) !== -1 ? String(d.memberType) : "Individual";
+  const interests = (Array.isArray(d.interests) ? d.interests : String(d.interests || "").split("|"))
+    .map(function (x) { return String(x).trim(); })
+    .filter(function (x) { return MEMBER_INTERESTS.indexOf(x) !== -1; });
+
+  const existing = rows("Members").filter(function (m) { return String(m.email).toLowerCase() === email; })[0];
+  const rec = {
+    id: existing ? existing.id : uid(),
+    createdAt: existing ? existing.createdAt : nowISO(),
+    name: name, email: email, phone: phone,
+    memberType: type,
+    groupName: oneLine(d.groupName, 120),
+    interests: interests,
+    notes: oneLine(d.notes, 400),
+    status: existing ? existing.status : "active",
+    updatedAt: nowISO()
+  };
+  upsertRow("Members", "id", rec);
+
+  try {
+    MailApp.sendEmail({
+      to: email,
+      subject: "You are on the Hjelte community list",
+      htmlBody: "<p>Thanks for joining the Hjelte Sports Center community list, " + escapeHtml_(name) + ".</p>" +
+        "<p>We have your email and your phone on file, so we can reach you about field news, work days and the projects you said you were interested in.</p>" +
+        (interests.length ? "<p>You told us you would like to help with: " + escapeHtml_(interests.join(", ")) + ".</p>" : "") +
+        "<p>Nothing has been charged and no payment details were collected here. If you chose to contribute toward monthly maintenance or a project, you will do that yourself from the community page whenever you are ready.</p>" +
+        "<p>— Hjelte Sports Center community hub</p>"
+    });
+  } catch (err) { /* the record is saved either way */ }
+
+  return { ok: true, member: { id: rec.id, name: rec.name, email: rec.email } };
+}
+function escapeHtml_(s) {
+  return String(s || "").replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+  });
+}
+
 function doPost(e) {
   let body = {};
   try { body = JSON.parse((e.postData && e.postData.contents) || "{}"); } catch (err) { return json({ ok: false, error: "Bad JSON" }); }
@@ -239,6 +312,7 @@ function doPost(e) {
     // public actions
     if (action === "subscribe") return json(withLock(() => subscribe(body)));
     if (action === "submitGroup") return json(withLock(() => submitGroup(body.data || {})));
+    if (action === "joinCommunity") return json(withLock(() => joinCommunity(body.data || {})));
     if (action === "requestCode") return json(withLock(() => requestCode(body.email)));
     if (action === "verifyCode") return json(withLock(() => verifyCode(body.email, body.code)));
     // admin actions

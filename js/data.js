@@ -420,6 +420,31 @@ window.HJELTE = {
   /* ------------------------------------------------------------------
      Ways to contribute
      ------------------------------------------------------------------ */
+  /* ------------------------------------------------------------------
+     Community membership — the HOA-style layer. Anyone who uses the park
+     can join: permitted organizations, community and independent groups,
+     and neighbours on their own. Sign-up first (email + phone, both
+     required), contribution second.
+     stripe.* stay empty until the payment links exist; the buttons
+     explain themselves rather than 404 when they are blank.
+     ------------------------------------------------------------------ */
+  membership: {
+    memberTypes: ["Individual", "Community group", "Permitted organization", "Business"],
+    interests: [
+      { id: "Monthly maintenance", label: "Monthly maintenance", note: "A recurring contribution toward the upkeep the City does not cover." },
+      { id: "One-time project support", label: "One-time project support", note: "Put something toward a specific project on the list." },
+      { id: "Volunteer time", label: "Volunteer time", note: "Work days, field prep, cleanups, setting up for events." },
+      { id: "Materials or equipment", label: "Materials or equipment", note: "Paint, nets, tools, water, shade, anything the list needs." }
+    ],
+    benefits: [
+      "Share the cost of keeping the park in good shape, month to month",
+      "Back a specific project from the list instead of a general fund",
+      "Get field notices — closures, work days, schedule changes",
+      "Have a say in which project the community takes on next"
+    ],
+    stripe: { monthly: "", oneTime: "" }
+  },
+
   contribute: [
     { id: "volunteer", title: "Volunteer", icon: "hands",
       text: "Support cleanup days, sports programs, events, field preparation and community projects.",

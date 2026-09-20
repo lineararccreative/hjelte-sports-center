@@ -859,6 +859,105 @@
     }
   }));
 
+  /* ---------------- community membership ---------------- */
+  function renderMembership() {
+    const M = D.membership; if (!M || !$("#memberForm")) return;
+    $("#memberBenefits").innerHTML = M.benefits.map((b) => `<li>${esc(b)}</li>`).join("");
+    $("#memberType").innerHTML = `<option value="">${I18.t("Select…")}</option>` +
+      M.memberTypes.map((t) => `<option>${esc(t)}</option>`).join("");
+    $("#memberInterests").innerHTML = M.interests.map((i, n) => `<label class="check-item">
+      <input type="checkbox" name="interests" value="${esc(i.id)}"${n === 0 ? " checked" : ""}>
+      <span><b>${esc(i.label)}</b><small>${esc(i.note)}</small></span></label>`).join("");
+    // a group name only makes sense for the group and organization types
+    const typeSel = $("#memberType"), wrap = $("#memberGroupWrap");
+    typeSel.addEventListener("change", () => {
+      const needsName = typeSel.value && typeSel.value !== "Individual";
+      wrap.hidden = !needsName;
+      wrap.querySelector("input").required = !!needsName;
+    });
+
+    const pay = [
+      { key: "monthly", title: "Monthly maintenance", text: "A recurring contribution toward the upkeep the City does not cover — mowing help, materials, small repairs.", cta: "Set up a monthly contribution", icon: "hands" },
+      { key: "oneTime", title: "One-time toward a project", text: "Put something toward a specific project from the list — restrooms, irrigation, signage.", cta: "Make a one-time contribution", icon: "target" }
+    ];
+    $("#payGrid").innerHTML = pay.map((o) => {
+      const url = safeUrl((D.membership.stripe || {})[o.key]);
+      return `<article class="pay-card">
+        <span class="ic">${icon(o.icon)}</span>
+        <h4>${esc(o.title)}</h4>
+        <p>${esc(o.text)}</p>
+        ${url
+          ? `<a class="btn btn-primary btn-sm" href="${esc(url)}" target="_blank" rel="noopener">${esc(o.cta)}</a>`
+          : `<p class="pay-pending">${I18.t("Opening soon — join the list above and we'll email you the moment contributions open.")}</p>`}
+      </article>`;
+    }).join("");
+  }
+
+  /* the member form: same spam controls as the group form */
+  const mCaptcha = { a: 0, b: 0 };
+  function newMemberCaptcha() {
+    const q = $("#memberCaptchaQuestion"); if (!q) return;
+    mCaptcha.a = 2 + Math.floor(Math.random() * 8);
+    mCaptcha.b = 1 + Math.floor(Math.random() * 8);
+    q.textContent = `${mCaptcha.a} + ${mCaptcha.b} = ?`;
+    const ts = $("#memberFormTs"); if (ts) ts.value = String(Date.now());
+    const f = $('#memberForm [name="captcha"]'); if (f) f.value = "";
+  }
+  function initMemberForm() {
+    const form = $("#memberForm"), statusEl = $("#memberFormStatus");
+    if (!form) return;
+    newMemberCaptcha();
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      $$(".field-error", form).forEach((n) => n.remove());
+      const cf = form.querySelector('[name="captcha"]');
+      cf.setCustomValidity(Number(String(cf.value).trim()) === mCaptcha.a + mCaptcha.b ? "" : I18.t("That answer is not right — please try the sum again."));
+      const picked = $$('input[name="interests"]:checked', form).length;
+      const box = $$('input[name="interests"]', form)[0];
+      box.setCustomValidity(picked ? "" : I18.t("Pick at least one way you'd like to help."));
+      $$("input, select, textarea", form).forEach((i) => { i.classList.add("touched"); i.setAttribute("aria-invalid", String(!i.checkValidity())); });
+      if (!form.checkValidity()) {
+        const bad = $$(":invalid", form).filter((f) => f.name);
+        bad.forEach((f) => {
+          const lbl = f.closest("label") || f.closest("fieldset") || f.parentElement;
+          const id = "m-" + (f.name || "f") + "-err";
+          if (!document.getElementById(id)) lbl.insertAdjacentHTML("beforeend", `<span class="field-error" id="${id}">${esc(f.validationMessage)}</span>`);
+        });
+        statusEl.textContent = I18.t("Please complete the required fields.") + ` (${bad.length})`;
+        statusEl.classList.add("is-error");
+        if (bad[0]) bad[0].focus();
+        return;
+      }
+      statusEl.classList.remove("is-error");
+      const fd = new FormData(form);
+      const data = {
+        name: fd.get("name"), email: fd.get("email"), phone: fd.get("phone"),
+        memberType: fd.get("memberType"), groupName: fd.get("groupName") || "",
+        interests: fd.getAll("interests"), notes: fd.get("notes") || "",
+        website2: fd.get("website2") || "", formTs: fd.get("formTs")
+      };
+      const done = () => {
+        statusEl.textContent = I18.t("You're on the community list. Check your email for a confirmation.");
+        form.reset(); $("#memberGroupWrap").hidden = true; newMemberCaptcha();
+        renderMembership();
+      };
+      if (String(data.website2).trim() || Date.now() - Number(data.formTs || 0) < 3000) { done(); return; }
+      if (API) {
+        try {
+          statusEl.textContent = I18.t("Sending…");
+          await api("joinCommunity", data);
+          done(); return;
+        } catch (err) { statusEl.textContent = err.message; statusEl.classList.add("is-error"); return; }
+      }
+      window.location.href = mailto(`Hjelte community sign-up: ${data.name}`,
+        [`Name: ${data.name}`, `Email: ${data.email}`, `Phone: ${data.phone}`,
+         `Joining as: ${data.memberType}`, `Group: ${data.groupName || "—"}`,
+         `Would like to help with: ${data.interests.join(", ") || "—"}`, "", data.notes || ""].join("\n"));
+      statusEl.textContent = I18.t("Opening your email app with the details pre-filled. Send it to complete your sign-up.");
+    });
+  }
+  initMemberForm();
+
   /* ---------------- lightbox ---------------- */
   /* One <dialog> serves every zoomable image: it lives in the top layer, so no
      stacking context can clip it, and Esc / backdrop click close it for free. */
@@ -896,7 +995,7 @@
     fillGroupFilter();
     renderSports(); renderHappening(currentRange); renderSchedule(); renderLegend(); renderLastUpdated();
     renderGroups(); renderRoster(); renderFeatured(); renderAreas(); renderProjects(); renderContribute(); renderConnect();
-    renderUpdates(); renderSubscribeSports(); renderStewardship();
+    renderUpdates(); renderSubscribeSports(); renderStewardship(); renderMembership();
     $$("[data-count]").forEach((el) => { if (el.closest(".in")) countUp(el); });
   }
   window.HJELTE_RERENDER = renderAll;

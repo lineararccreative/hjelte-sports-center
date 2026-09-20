@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/img/hero-aerial.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="css/styles.css?v=2026-09-19h">
+  <link rel="stylesheet" href="css/styles.css?v=2026-09-19i">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -94,6 +94,7 @@
         <li><a href="#groups">Groups</a></li>
         <li><a href="#sports">Sports</a></li>
         <li><a href="#projects">Projects</a></li>
+        <li><a href="#membership">Join</a></li>
         <li><a href="#get-involved">Get Involved</a></li>
         <li><a href="#connect">Connect</a></li>
       </ul>
@@ -673,6 +674,60 @@
 </section>
 
 <!-- ============================ 11. CONTRIBUTE ============================ -->
+<!-- ======================= COMMUNITY MEMBERSHIP ======================= -->
+<section class="section membership" id="membership">
+  <div class="container">
+    <div class="section-head reveal">
+      <h2>Join the Hjelte Community</h2>
+      <p class="lead">Hjelte belongs to everyone who uses it — permitted organizations, community and independent groups, and neighbours who just come to play. Joining is how the people who use the park share the work and the cost of keeping it good.</p>
+    </div>
+
+    <div class="member-flow reveal">
+      <article class="member-step">
+        <p class="step-mark"><span>1</span> Sign up</p>
+        <h3>Tell us who you are</h3>
+        <p class="step-lead">We ask for both an email and a phone number so the hub can reach you either way — and so either one can sign you in later.</p>
+        <ul class="check-list" id="memberBenefits"></ul>
+      </article>
+
+      <form class="card form-card member-form" id="memberForm" novalidate>
+        <div class="form-grid">
+          <label class="span-2"><span>Full Name *</span><input name="name" required autocomplete="name"></label>
+          <label><span>Email *</span><input name="email" type="email" required autocomplete="email" inputmode="email"></label>
+          <label><span>Phone *</span><input name="phone" type="tel" required autocomplete="tel" inputmode="tel" placeholder="e.g. 818-555-0134"></label>
+          <label class="span-2"><span>I'm joining as *</span>
+            <select name="memberType" required id="memberType"><option value="">Select…</option></select>
+          </label>
+          <label class="span-2" id="memberGroupWrap" hidden><span>Group or organization name</span><input name="groupName" autocomplete="organization"></label>
+          <fieldset class="span-2 check-grid"><legend>How would you like to help? *</legend>
+            <div id="memberInterests"></div>
+          </fieldset>
+          <label class="span-2"><span>Anything else <em>optional</em></span><textarea name="notes" rows="2" maxlength="400" placeholder="Skills, equipment you can lend, a project you care about."></textarea></label>
+          <label class="span-2 human-check"><span>Quick check: <b id="memberCaptchaQuestion">…</b> *</span>
+            <input name="captcha" required inputmode="numeric" autocomplete="off" aria-describedby="memberCaptchaHelp" style="max-width:180px">
+            <small id="memberCaptchaHelp" class="field-help">Answer in digits — this keeps automated spam off the member list.</small>
+          </label>
+          <p class="hp-field" aria-hidden="true"><label>Leave this field empty<input type="text" name="website2" tabindex="-1" autocomplete="off"></label></p>
+          <input type="hidden" name="formTs" id="memberFormTs">
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn btn-primary btn-lg">Join the community list</button>
+          <p class="form-status" id="memberFormStatus" role="status"></p>
+        </div>
+        <p class="fine-print">No payment details are collected here. Joining records your name, email and phone with the hub so we can reach you — nothing more.</p>
+      </form>
+    </div>
+
+    <div class="member-step contribute-step reveal" id="contributeStep">
+      <p class="step-mark"><span>2</span> Contribute</p>
+      <h3>Chip in when you're ready</h3>
+      <p class="step-lead">Contributions are handled on Stripe's own secure page — card details never touch this site. You pick the amount there.</p>
+      <div class="pay-grid" id="payGrid"></div>
+      <p class="fine-print">Los Angeles Cricket administers community contributions for Hjelte projects and upkeep. Contributions are not payments to the City of Los Angeles and do not grant permit status or exclusive use of any field.</p>
+    </div>
+  </div>
+</section>
+
 <section class="section contribute" id="get-involved">
   <div class="container">
     <div class="section-head reveal">
@@ -763,8 +818,8 @@
 
 <button class="to-top" id="toTop" aria-label="Back to top">↑</button>
 
-<script src="js/data.js?v=2026-09-19h"></script>
-<script src="js/i18n.js?v=2026-09-19h"></script>
-<script src="js/app.js?v=2026-09-19h"></script>
+<script src="js/data.js?v=2026-09-19i"></script>
+<script src="js/i18n.js?v=2026-09-19i"></script>
+<script src="js/app.js?v=2026-09-19i"></script>
 </body>
 </html>

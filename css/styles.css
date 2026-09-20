@@ -1016,3 +1016,40 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
 .care-who { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; line-height: 1.5; margin: 0 0 10px; }
 .care-who b { display: block; font-family: var(--display); font-size: 1.25rem; letter-spacing: 0; text-transform: none; color: var(--ink); font-weight: 700; }
 .care-card p:last-child { margin: 0; font-size: .92rem; line-height: 1.6; color: var(--ink-3); }
+
+
+/* ---------- Community membership ---------- */
+.membership { background: var(--off); }
+.member-flow { display: grid; gap: 24px; align-items: start; }
+@media (min-width: 900px) { .member-flow { grid-template-columns: 1fr 1.05fr; gap: 40px; } }
+.member-step { min-width: 0; }
+/* the numbers here are a real sequence — sign up, then contribute */
+.step-mark { display: flex; align-items: center; gap: 10px; font-size: .74rem; text-transform: uppercase;
+  letter-spacing: .12em; font-weight: 700; color: var(--muted); margin: 0 0 10px; }
+.step-mark span { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--ink); color: #fff; font-size: .8rem; letter-spacing: 0; }
+.member-step h3 { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: 8px; }
+.step-lead { color: var(--ink-3); margin-bottom: 18px; max-width: 62ch; }
+.member-form .form-grid { gap: 16px; }
+
+.check-grid { border: 0; padding: 0; margin: 0; min-width: 0; }
+.check-grid legend { font-size: .78rem; font-weight: 600; color: var(--ink-3); margin-bottom: 10px; padding: 0; }
+.check-grid > div { display: grid; gap: 8px; }
+.check-item { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;
+  border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: #fff; cursor: pointer;
+  transition: border-color .18s, background .18s; }
+.check-item:hover { border-color: var(--ink-3); }
+.check-item:has(input:checked) { border-color: var(--grass); background: var(--grass-light); }
+.check-item input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--grass); }
+.check-item b { display: block; font-family: var(--body); font-size: .92rem; font-weight: 600; }
+.check-item small { display: block; color: var(--muted); font-size: .8rem; line-height: 1.45; margin-top: 2px; }
+
+.contribute-step { margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--line); }
+.pay-grid { display: grid; gap: 14px; margin: 18px 0 16px; }
+@media (min-width: 720px) { .pay-grid { grid-template-columns: 1fr 1fr; } }
+.pay-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+.pay-card .ic { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px;
+  background: var(--grass-light); color: var(--grass-dark); margin-bottom: 12px; }
+.pay-card h4 { font-family: var(--display); font-size: 1.2rem; margin-bottom: 6px; }
+.pay-card p { font-size: .92rem; color: var(--ink-3); margin-bottom: 14px; line-height: 1.6; }
+.pay-pending { font-size: .86rem; color: var(--muted); font-style: normal; margin: 0; }
