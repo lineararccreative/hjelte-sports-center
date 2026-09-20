@@ -27,6 +27,18 @@ const CODE_TTL_MIN = 10;
 const TOKEN_TTL_DAYS = 30;
 const MAX_CODE_ATTEMPTS = 5;
 
+/* ------------------------------------------------------------------ Stripe
+   The secret key is NEVER in this file, the repo, or any page the browser
+   sees. Put it in Project Settings → Script properties:
+     STRIPE_SECRET_KEY     a RESTRICTED key, "Checkout Sessions: write" only
+     STRIPE_PRICE_MONTHLY  the recurring per-person price ($10.50 / month)
+   The monthly rate lives on that Stripe price, so billing has exactly one
+   source of truth. js/data.js only mirrors it for display. */
+const STRIPE_CHECKOUT_URL = "https://api.stripe.com/v1/checkout/sessions";
+const ONETIME_MIN_CENTS = 500;     // $5
+const ONETIME_MAX_CENTS = 500000;  // $5,000 — above this, talk to a person
+const MAX_HEADCOUNT = 300;         // a slipped digit must not bill $21,000/mo
+
 const SCHEMA = {
   Groups: ["id", "name", "short", "sport", "category", "permitStatus", "paidPermit", "badges", "programType", "ages", "level", "participants", "days", "times", "website", "social", "socialHandle", "email", "description", "description_es", "logoUrl", "status", "example", "updatedAt"],
   Schedule: ["id", "groupId", "day", "start", "end", "sport", "facility", "type", "category", "title", "notes", "updatedBy", "updatedAt"],
@@ -334,6 +346,7 @@ function doPost(e) {
     if (action === "subscribe") return json(withLock(() => subscribe(body)));
     if (action === "submitGroup") return json(withLock(() => submitGroup(body.data || {})));
     if (action === "joinCommunity") return json(withLock(() => joinCommunity(body.data || {})));
+    if (action === "createCheckout") return json(createCheckout(body.data || {}));
     if (action === "requestCode") return json(withLock(() => requestCode(body.email)));
     if (action === "verifyCode") return json(withLock(() => verifyCode(body.email, body.code)));
     // admin actions
@@ -603,6 +616,90 @@ function approveSubmission(admin, d) {
   s.status = "approved"; upsertRow("Submissions", "id", s);
   if (d.makeAdmin && s.email) addAdmin(admin, { email: s.email, role: "community", groupIds: [g.id], name: s.contact });
   touch(); return { ok: true, group: g };
+}
+
+/* -------------------------------------------------- public: contributions */
+function scriptProp_(name) {
+  return String(PropertiesService.getScriptProperties().getProperty(name) || "").trim();
+}
+/* Pure: the form body Stripe expects. Split out from the network call so the
+   pricing and shape can be exercised without a key. */
+function checkoutPayload_(o) {
+  const p = {
+    mode: o.mode,
+    success_url: SITE_URL + "?contributed=1",
+    cancel_url: SITE_URL + "#get-involved",
+    client_reference_id: String(o.ref || "").slice(0, 200)
+  };
+  if (o.mode === "subscription") {
+    p["line_items[0][price]"] = o.priceId;
+    p["line_items[0][quantity]"] = String(o.quantity);
+  } else {
+    p.submit_type = "donate";
+    p["line_items[0][quantity]"] = "1";
+    p["line_items[0][price_data][currency]"] = "usd";
+    p["line_items[0][price_data][unit_amount]"] = String(o.amountCents);
+    p["line_items[0][price_data][product_data][name]"] = o.productName;
+  }
+  Object.keys(o.metadata || {}).forEach(function (k) {
+    const v = o.metadata[k];
+    if (v !== "" && v !== null && v !== undefined) p["metadata[" + k + "]"] = String(v).slice(0, 480);
+  });
+  return p;
+}
+function createCheckout(d) {
+  throttleGlobal("createCheckout", 120);
+  const key = scriptProp_("STRIPE_SECRET_KEY");
+  if (!key) throw new Error("Contributions are not switched on yet.");
+  const mode = d.mode === "subscription" ? "subscription" : "payment";
+  const grp = d.groupId ? rows("Groups").find((g) => String(g.id) === String(d.groupId)) : null;
+  const proj = d.projectId ? rows("Projects").find((p) => String(p.id) === String(d.projectId)) : null;
+  const o = {
+    mode: mode,
+    // the caller's ref is a memo, so it is reduced to the characters Stripe
+    // allows rather than trusted
+    ref: String(d.ref || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 200),
+    metadata: {
+      groupId: grp ? grp.id : "", groupName: grp ? grp.name : "Not for a group",
+      projectId: proj ? proj.id : "", projectTitle: proj ? proj.title : "General maintenance",
+      source: "hjeltesportscenter.com"
+    }
+  };
+  if (mode === "subscription") {
+    const priceId = scriptProp_("STRIPE_PRICE_MONTHLY");
+    if (!priceId) throw new Error("Monthly contributions are not switched on yet.");
+    if (!grp) throw new Error("Choose a group for a monthly contribution.");
+    // The headcount comes from the admin's row, never from the caller, and it
+    // is fixed onto the subscription here. An admin editing the roster later
+    // does not change what somebody has already agreed to pay.
+    const n = Math.round(Number(grp.participants) || 0);
+    if (n < 1) throw new Error("That group has no headcount on file yet. An admin can add one.");
+    o.priceId = priceId;
+    o.quantity = Math.min(MAX_HEADCOUNT, n);
+    o.metadata.headcount = String(o.quantity);
+  } else {
+    const cents = Math.round(Number(d.amountCents) || 0);
+    if (!(cents >= ONETIME_MIN_CENTS)) throw new Error("The smallest contribution is $" + (ONETIME_MIN_CENTS / 100) + ".");
+    if (cents > ONETIME_MAX_CENTS) throw new Error("For more than $" + (ONETIME_MAX_CENTS / 100) + ", please get in touch so we can thank you properly.");
+    o.amountCents = cents;
+    o.productName = "Hjelte Community Maintenance — one-time contribution";
+  }
+  const res = UrlFetchApp.fetch(STRIPE_CHECKOUT_URL, {
+    method: "post",
+    headers: { Authorization: "Bearer " + key },
+    payload: checkoutPayload_(o),
+    muteHttpExceptions: true
+  });
+  const code = res.getResponseCode();
+  let out = {};
+  try { out = JSON.parse(res.getContentText() || "{}"); } catch (err) { out = {}; }
+  if (code < 200 || code >= 300 || !out.url) {
+    // Stripe's error can quote the request back; log it, never return it to
+    // the browser.
+    Logger.log("Stripe checkout failed " + code + ": " + String(res.getContentText()).slice(0, 500));
+    throw new Error("Stripe could not start that contribution. Please try again.");
+  }
+  return { ok: true, url: out.url };
 }
 
 /* ---------------------------------------------------- public: submissions */
