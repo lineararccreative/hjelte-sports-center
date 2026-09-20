@@ -386,7 +386,8 @@
     const grid = $("#weekGrid"), list = $("#weekList");
     $("#scheduleEmpty").hidden = items.length > 0;
     grid.hidden = list.hidden = items.length === 0;
-    grid.style.gridTemplateColumns = `56px repeat(${days.length}, 1fr)`;
+    grid.style.gridTemplateColumns = `56px repeat(${days.length}, var(--wg-track, 1fr))`;
+    grid.style.setProperty("--wg-days", days.length);
     const bodyH = (END - START) / 60 * HOUR_H;
     let html = `<div class="wg-head"></div>` + days.map((d) => `<div class="wg-head${d === today.getDay() ? " is-today" : ""}">${DAYS_S[d]}${d === today.getDay() ? "<em>Today</em>" : ""}</div>`).join("");
     html += `<div class="wg-gutter" style="height:${bodyH}px">` + Array.from({ length: (END - START) / 60 + 1 }, (_, i) => `<span style="top:${i * HOUR_H}px">${fmtTime(`${String(6 + i).padStart(2, "0")}:00`)}</span>`).join("") + `</div>`;
@@ -808,6 +809,22 @@
     $("#mapsLink").href = c.mapsUrl; $("#cityLink").href = c.cityPageUrl;
     $("#year").textContent = new Date().getFullYear();
   }
+
+  /* schedule view switch — the week grid scrolls sideways on a phone, the
+     day list reads better for "what is on today". Both stay available. */
+  const schedSection = document.getElementById("schedule");
+  $$(".sched-view .sv-btn").forEach((b) => b.addEventListener("click", () => {
+    schedSection.dataset.view = b.dataset.view;
+    $$(".sched-view .sv-btn").forEach((o) => {
+      const on = o === b;
+      o.classList.toggle("is-active", on);
+      o.setAttribute("aria-pressed", on ? "true" : "false");
+    });
+    if (b.dataset.view === "grid") {
+      const col = $("#weekGrid .wg-col.is-today") || $("#weekGrid .wg-col");
+      if (col) col.scrollIntoView({ behavior: scrollBehavior(), inline: "start", block: "nearest" });
+    }
+  }));
 
   /* ---------------- lightbox ---------------- */
   /* One <dialog> serves every zoomable image: it lives in the top layer, so no

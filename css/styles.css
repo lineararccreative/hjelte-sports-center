@@ -302,15 +302,15 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .wg-col.is-today { background-color: rgba(46,125,79,.035); }
 .wg-event {
   position: absolute; border-radius: 8px; padding: 6px 8px; font-size: .74rem; line-height: 1.25; overflow: hidden; cursor: pointer;
-  background: color-mix(in srgb, var(--sport) 14%, #fff); border-left: 3px solid var(--sport); color: var(--ink); text-align: left;
+  background: color-mix(in srgb, var(--sport) 14%, #fff); border: 1px solid color-mix(in srgb, var(--sport) 55%, #fff); color: var(--ink); text-align: left;
   transition: transform .15s var(--ease), box-shadow .15s;
 }
 .wg-event:hover { transform: scale(1.02); box-shadow: var(--shadow); z-index: 3; }
 .wg-event b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wg-event span { display: block; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.wg-event.community { border-left-style: dashed; background: color-mix(in srgb, var(--sport) 8%, #fff); outline: 1px dashed color-mix(in srgb, var(--sport) 40%, #fff); outline-offset: -1px; }
-.wg-event.open { background: var(--grass-light); border-left-color: var(--grass); }
-.wg-event.maintenance { background: repeating-linear-gradient(135deg, #F1F0EB 0 6px, #E4E2DA 6px 12px); border-left-color: var(--muted-2); color: var(--ink-3); }
+.wg-event.community { border-style: dashed; background: color-mix(in srgb, var(--sport) 8%, #fff); }
+.wg-event.open { background: var(--grass-light); border-color: color-mix(in srgb, var(--grass) 45%, #fff); }
+.wg-event.maintenance { background: repeating-linear-gradient(135deg, #F1F0EB 0 6px, #E4E2DA 6px 12px); border-color: var(--muted-2); color: var(--ink-3); }
 
 @media (max-width: 1023.98px) { .week-list { display: grid; gap: 12px; } .week-list[hidden] { display: none; } }
 .wl-day { background: #fff; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
@@ -955,4 +955,47 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
   .btn, .chip, .tab, .mode-btn, .area-tile, .contribute-card, .sport-card, .doc, .zoom-btn { transition: none; }
   .btn:active, .chip:active, .tab:active, .mode-btn:active, .area-tile:active,
   .contribute-card:active, .sport-card:active, .doc:active, .zoom-btn:active { transform: none; }
+}
+
+
+/* =====================================================================
+   Schedule on a phone
+   ---------------------------------------------------------------------
+   The wide week grid is the clearest view of the week, so keep it on a
+   phone rather than replacing it: the grid scrolls sideways one day at a
+   time with the hour gutter pinned, and the day list stays one tap away.
+   ===================================================================== */
+.sched-view { display: none; }
+@media (max-width: 1023.98px) {
+  .sched-view { display: inline-flex; gap: 4px; padding: 4px; margin-bottom: 14px;
+    background: var(--off); border: 1px solid var(--line); border-radius: 999px; }
+  .sv-btn { appearance: none; border: 0; background: transparent; font: inherit; font-size: .85rem;
+    font-weight: 600; color: var(--ink-3); padding: 8px 18px; min-height: 44px; border-radius: 999px; cursor: pointer; }
+  .sv-btn.is-active { background: var(--ink); color: #fff; }
+  .sv-btn:focus-visible { outline: 3px solid var(--gold-dark); outline-offset: 2px; }
+
+  #schedule[data-view="grid"] .week-grid {
+    display: grid; background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--shadow-sm); overflow-x: auto; overflow-y: hidden;
+    min-width: 0; width: 100%;
+    scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain; scrollbar-width: none;
+  }
+  #schedule[data-view="grid"] .week-grid::-webkit-scrollbar { display: none; }
+  /* fixed-width day tracks make the content overflow, so the grid itself
+     stays inside the viewport and scrolls */
+  #schedule[data-view="grid"] .week-grid { --wg-track: 72vw; max-width: 100%; }
+  #schedule[data-view="grid"] .week-list { display: none; }
+  #schedule[data-view="list"] .week-grid { display: none; }
+  #schedule[data-view="list"] .week-list { display: grid; gap: 12px; }
+  .week-grid[hidden], .week-list[hidden] { display: none !important; }
+
+  /* hour gutter and its header stay pinned while the days slide past */
+  .wg-head:first-child, .wg-gutter { position: sticky; left: 0; z-index: 4; }
+  .wg-head:first-child { background: #fff; border-right: 1px solid var(--line); }
+  .wg-gutter { background: var(--off); }
+  .wg-head { position: sticky; top: 0; z-index: 3; scroll-snap-align: start; }
+  .wg-col { scroll-snap-align: start; }
+  .wg-event { font-size: .8rem; padding: 7px 9px; }
+  .wg-event b { white-space: normal; }
 }

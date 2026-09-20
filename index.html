@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/img/hero-aerial.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="css/styles.css?v=2026-09-19f">
+  <link rel="stylesheet" href="css/styles.css?v=2026-09-19g">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -89,8 +89,8 @@
     <nav class="site-nav" id="siteNav" aria-label="Primary">
       <ul>
         <li><a href="#facility">Map</a></li>
-        <li><a href="#happening">Today</a></li>
         <li><a href="#schedule">Schedule</a></li>
+        <li><a href="#happening">Today</a></li>
         <li><a href="#groups">Groups</a></li>
         <li><a href="#sports">Sports</a></li>
         <li><a href="#projects">Projects</a></li>
@@ -383,6 +383,45 @@
   </div>
 </section>
 
+<section class="section schedule" id="schedule" data-view="grid">
+  <div class="container">
+    <div class="section-head reveal">
+      <p class="eyebrow">Master Facility Schedule</p>
+      <h2>Community Schedule</h2>
+      <p class="lead">A weekly picture of who is on which field, and when. Filter by sport, day, facility, activity type, organization or user category.</p>
+    </div>
+
+    <form class="filter-bar reveal" id="scheduleFilters" aria-label="Schedule filters">
+      <label><span>Sport</span><select name="sport"><option value="">All sports</option></select></label>
+      <label><span>Day</span><select name="day"><option value="">All days</option></select></label>
+      <label><span>Facility</span><select name="facility"><option value="">All facilities</option></select></label>
+      <label><span>Activity Type</span><select name="type"><option value="">All types</option></select></label>
+      <label><span>Organization</span><select name="group"><option value="">All organizations</option></select></label>
+      <label><span>User Category</span><select name="category"><option value="">All categories</option></select></label>
+      <button type="reset" class="btn btn-text">Clear filters</button>
+    </form>
+
+    <div class="sched-view reveal" role="group" aria-label="Schedule view">
+      <button type="button" class="sv-btn is-active" data-view="grid" aria-pressed="true">Week grid</button>
+      <button type="button" class="sv-btn" data-view="list" aria-pressed="false">Day list</button>
+    </div>
+
+    <div class="week-grid reveal" id="weekGrid" aria-label="Weekly schedule grid"></div>
+    <div class="week-list reveal" id="weekList" aria-label="Weekly schedule list"></div>
+    <p class="empty-note" id="scheduleEmpty" hidden>No activities match these filters.</p>
+
+    <div class="legend reveal" id="legend"></div>
+
+    <div class="schedule-foot reveal">
+      <p class="disclaimer">“Schedules displayed here are provided as a community information resource and may change. Official permits, posted park regulations and City of Los Angeles Department of Recreation and Parks requirements govern facility use.”</p>
+      <div class="schedule-meta">
+        <span>Last Updated: <time id="lastUpdated"></time></span>
+        <a href="#connect" class="btn btn-outline btn-sm" data-topic="Schedule update">Report a Schedule Update</a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============================ 3. SPORTS ============================ -->
 <section class="section sports" id="sports">
   <div class="container">
@@ -440,39 +479,7 @@
 </section>
 
 <!-- ============================ 5. SCHEDULE ============================ -->
-<section class="section schedule" id="schedule">
-  <div class="container">
-    <div class="section-head reveal">
-      <p class="eyebrow">Master Facility Schedule</p>
-      <h2>Community Schedule</h2>
-      <p class="lead">A weekly picture of who is on which field, and when. Filter by sport, day, facility, activity type, organization or user category.</p>
-    </div>
 
-    <form class="filter-bar reveal" id="scheduleFilters" aria-label="Schedule filters">
-      <label><span>Sport</span><select name="sport"><option value="">All sports</option></select></label>
-      <label><span>Day</span><select name="day"><option value="">All days</option></select></label>
-      <label><span>Facility</span><select name="facility"><option value="">All facilities</option></select></label>
-      <label><span>Activity Type</span><select name="type"><option value="">All types</option></select></label>
-      <label><span>Organization</span><select name="group"><option value="">All organizations</option></select></label>
-      <label><span>User Category</span><select name="category"><option value="">All categories</option></select></label>
-      <button type="reset" class="btn btn-text">Clear filters</button>
-    </form>
-
-    <div class="week-grid reveal" id="weekGrid" aria-label="Weekly schedule grid"></div>
-    <div class="week-list reveal" id="weekList" aria-label="Weekly schedule list"></div>
-    <p class="empty-note" id="scheduleEmpty" hidden>No activities match these filters.</p>
-
-    <div class="legend reveal" id="legend"></div>
-
-    <div class="schedule-foot reveal">
-      <p class="disclaimer">“Schedules displayed here are provided as a community information resource and may change. Official permits, posted park regulations and City of Los Angeles Department of Recreation and Parks requirements govern facility use.”</p>
-      <div class="schedule-meta">
-        <span>Last Updated: <time id="lastUpdated"></time></span>
-        <a href="#connect" class="btn btn-outline btn-sm" data-topic="Schedule update">Report a Schedule Update</a>
-      </div>
-    </div>
-  </div>
-</section>
 
 <!-- ============================ 6. GROUPS ============================ -->
 <section class="section groups" id="groups">
@@ -739,8 +746,8 @@
 
 <button class="to-top" id="toTop" aria-label="Back to top">↑</button>
 
-<script src="js/data.js?v=2026-09-19f"></script>
-<script src="js/i18n.js?v=2026-09-19f"></script>
-<script src="js/app.js?v=2026-09-19f"></script>
+<script src="js/data.js?v=2026-09-19g"></script>
+<script src="js/i18n.js?v=2026-09-19g"></script>
+<script src="js/app.js?v=2026-09-19g"></script>
 </body>
 </html>

@@ -87,6 +87,7 @@
     "Trash & Recycling Stations": "Estaciones de basura y reciclaje",
     "Small Repairs Wish List": "Lista de pequeñas reparaciones",
     "Trash & recycling": "Basura y reciclaje",
+    "Week grid": "Vista semanal", "Day list": "Lista por día", "Schedule view": "Vista del horario",
     "Who's playing right now?": "¿Quién está jugando ahora?",
     "Good to know: organized activities need a permit": "Bueno saberlo: las actividades organizadas requieren permiso",
     "Leagues, practices, games, tournaments, camps and other organized programs at Hjelte Sports Center are scheduled through a City of Los Angeles Recreation and Parks permit. Casual recreation — a pickup game, a family afternoon, a walk around the field — is always welcome without one.": "Las ligas, los entrenamientos, los partidos, los torneos, los campamentos y otros programas organizados en Hjelte Sports Center se programan mediante un permiso del Departamento de Recreación y Parques de la Ciudad de Los Ángeles. La recreación informal — un partido espontáneo, una tarde en familia, una caminata alrededor del campo — siempre es bienvenida sin permiso.",
