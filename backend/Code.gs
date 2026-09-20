@@ -160,8 +160,9 @@ function setMeta(key, value) { upsertRow("Meta", "key", { key, value }); }
 /* Every outbound email goes through here. While emails are paused only the
    sign-in code still sends, so an admin can always get back in; everything
    else is skipped and written to the log instead of the outside world.
-   Paused by default: getMeta returns "" until someone turns sending on. */
-function emailsPaused() { return String(getMeta("emailsSending")) !== "1"; }
+   Paused by default: meta() returns "" until someone turns sending on.
+   NB: the reader is meta(), not getMeta() — only setMeta() has the prefix. */
+function emailsPaused() { return String(meta("emailsSending")) !== "1"; }
 function sendMail_(kind, opts) {
   if (kind !== "auth" && emailsPaused()) {
     Logger.log("email paused (" + kind + ") -> " + opts.to + " :: " + opts.subject);
