@@ -828,8 +828,8 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
   .btn, .chip, .tab, .lang-toggle button, .link-icon { min-height: 44px; }
   .chip { padding-block: 11px; }
   .lang-toggle button { padding: 11px 14px; }
-  .sub-sports input, .radio-row input, .form-grid input[type="checkbox"] { width: 22px; height: 22px; }
-  .sub-sports label, .radio-row label { min-height: 44px; align-items: center; }
+  .sub-sports input, .radio-row input, .amt-row input[type="radio"], .form-grid input[type="checkbox"] { width: 22px; height: 22px; }
+  .sub-sports label, .radio-row label, .amt-row label { min-height: 44px; align-items: center; }
   .nav-toggle { padding: 12px; }
 }
 
@@ -1051,7 +1051,7 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
 .amt-other input { width: 92px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px;
   font: inherit; font-size: .92rem; background: #fff; }
 .amt-other input:disabled { background: var(--off); color: var(--muted); }
-.pay-card .btn[disabled] { opacity: .55; cursor: not-allowed; }
+.pay-card .btn[disabled], .pay-card .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 .pay-status { grid-column: 1 / -1; margin: 0; font-size: .88rem; color: var(--muted); min-height: 1.2em; }
 .pay-status.is-bad { color: #8A3B2E; font-weight: 600; }
 /* Cancelling has to be as easy to find as signing up. */

@@ -111,7 +111,7 @@
     "Pick a group above and the monthly amount appears here.": "Elige un grupo arriba y la cantidad mensual aparecerá aquí.",
     "That group has no headcount on file yet, so a monthly amount cannot be worked out.": "Ese grupo aún no tiene un número de miembros registrado, así que no se puede calcular una cantidad mensual.",
     "Give once, in any amount. The project and group you pick above travel with it as the memo.": "Da una sola vez, la cantidad que quieras. El proyecto y el grupo que elijas arriba viajan con la contribución como nota.",
-    "Amount": "Cantidad", "Other": "Otra", "Other amount, in dollars": "Otra cantidad, en dólares", "Cover one month": "Cubre un mes",
+    "Amount": "Cantidad", "Other": "Otra", "Other amount, in dollars": "Otra cantidad, en dólares", "Cover one month, paid once": "Cubre un mes, pago único", "Pick a group above first — the monthly amount depends on it.": "Elige primero un grupo arriba: la cantidad mensual depende de él.",
     "Already contributing monthly?": "¿Ya contribuyes cada mes?", "Manage or cancel your contribution": "Gestiona o cancela tu contribución", "(opens Stripe in a new tab)": "(abre Stripe en una pestaña nueva)",
     "Setting up a secure Stripe page…": "Preparando una página segura de Stripe…", "Opening Stripe…": "Abriendo Stripe…", "Taking you to Stripe…": "Llevándote a Stripe…",
     "Enter an amount between": "Introduce una cantidad entre", "and": "y",

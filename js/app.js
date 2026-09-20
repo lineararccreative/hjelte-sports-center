@@ -877,13 +877,15 @@
     syncMemberType();
 
     const perHead = Number(M.monthlyPerPerson || 0) * (1 + Number(M.adminPct || 0) / 100);
+    const keepAmt = ($$('#payGrid [name="payAmt"]').find((r) => r.checked) || {}).value;
+    const keepOther = ($("#payAmtOther") || {}).value;
     $("#payGrid").innerHTML = `
       <article class="pay-card">
         <span class="ic">${icon("hands")}</span>
         <h4>${esc(I18.t("Monthly maintenance"))}</h4>
         <p>${esc(usd(perHead))} ${esc(I18.t("per member per month"))} — $${esc(String(M.monthlyPerPerson))} ${esc(I18.t("toward the upkeep the City does not cover, plus"))} ${esc(String(M.adminPct))}% ${esc(I18.t("for administration and processing."))}</p>
         <p class="pay-total" id="payMonthlyTotal" role="status" aria-live="polite"></p>
-        <button class="btn btn-primary btn-sm" type="button" data-checkout="subscription">${esc(I18.t("Set up a monthly contribution"))}</button>
+        <button class="btn btn-primary btn-sm" type="button" data-checkout="subscription" aria-describedby="payMonthlyTotal">${esc(I18.t("Set up a monthly contribution"))}</button>
       </article>
       <article class="pay-card">
         <span class="ic">${icon("target")}</span>
@@ -902,6 +904,17 @@
       ${safeUrl(M.manageUrl) ? `<p class="pay-manage">${esc(I18.t("Already contributing monthly?"))} <a href="${esc(safeUrl(M.manageUrl))}" target="_blank" rel="noopener">${esc(I18.t("Manage or cancel your contribution"))}<span class="sr-only"> ${esc(I18.t("(opens Stripe in a new tab)"))}</span></a></p>` : ""}`;
     bindPayGrid();
     renderPayPicker();
+    // This whole grid is rebuilt again after an unrelated join-form submit and
+    // after the live-data refresh. Silently resetting a chosen $100 back to the
+    // $50 default would change what someone is about to pay, so put it back.
+    if (keepAmt) {
+      const again = $$('#payGrid [name="payAmt"]').find((r) => r.value === keepAmt && !r.closest("[hidden]"));
+      if (again) {
+        again.checked = true;
+        const other = $("#payAmtOther");
+        if (other) { other.disabled = keepAmt !== "other"; other.value = keepAmt === "other" ? (keepOther || "") : ""; }
+      }
+    }
   }
 
   /* ------------------------------------------------------------------
@@ -919,25 +932,51 @@
   const NO_GROUP = "Myself — not for a group";
   const PAY_PRESETS = [25, 50, 100];
   const PAY_MIN = 5, PAY_MAX = 5000;   // mirrors the backend's own limits
+  const PAY_MAX_HEADCOUNT = 300;       // and MAX_HEADCOUNT in backend/Code.gs
   const usd = (v) => "$" + (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, "");
-  let payRef = "", payBusy = false, payMonthAmount = 0;
+  let payRef = "", payBusy = false, payMonthAmount = 0, payLastPointer = false;
 
   /* Bound once on the container, which survives every re-render of the cards. */
   function bindPayGrid() {
     const grid = $("#payGrid"); if (!grid || grid.dataset.bound) return;
     grid.dataset.bound = "1";
+    grid.addEventListener("pointerdown", () => { payLastPointer = true; });
+    grid.addEventListener("keydown", () => { payLastPointer = false; });
+    // Coming back from Stripe restores this page from the back/forward cache
+    // with the old JS state intact, which would leave payBusy true and the
+    // button stuck reading "Opening Stripe…" forever.
+    window.addEventListener("pageshow", (e) => {
+      if (!e.persisted) return;
+      payBusy = false;
+      const s = $("#payStatus"); if (s) { s.textContent = ""; s.classList.remove("is-bad"); }
+      renderMembership();
+    });
     grid.addEventListener("change", (e) => {
       if (e.target.name !== "payAmt") return;
       const other = $("#payAmtOther");
       const isOther = e.target.value === "other";
       other.disabled = !isOther;
-      if (isOther) other.focus(); else other.value = "";
+      // Radio groups fire change on every arrow-key step, so focusing here
+      // would yank a keyboard user out of the group mid-traversal. Only a
+      // deliberate pointer press earns the jump to the box.
+      if (isOther) { if (e.isTrusted && payLastPointer) other.focus(); } else other.value = "";
     });
     grid.addEventListener("click", async (e) => {
       const btn = e.target.closest("[data-checkout]"); if (!btn || payBusy) return;
       const mode = btn.dataset.checkout;
       const status = $("#payStatus");
-      const say = (m, bad) => { if (status) { status.textContent = m; status.classList.toggle("is-bad", !!bad); } };
+      const say = (m, bad) => {
+        if (!status) return;
+        status.textContent = m;
+        status.classList.toggle("is-bad", !!bad);
+        // Errors interrupt; progress messages wait their turn.
+        status.setAttribute("role", bad ? "alert" : "status");
+      };
+      if (btn.getAttribute("aria-disabled") === "true") {
+        say(I18.t("Pick a group above first — the monthly amount depends on it."), true);
+        const gs = $("#payGroup"); if (gs) gs.focus();
+        return;
+      }
       const data = { mode, ref: payRef, projectId: $("#payProject").value || "", groupId: $("#payGroup").value || "" };
       if (mode === "payment") {
         const picked = $$('#payGrid [name="payAmt"]').find((r) => r.checked);
@@ -1013,7 +1052,10 @@
     // rather than first appearing on Stripe's page.
     const M = D.membership || {};
     const each = Number(M.monthlyPerPerson || 0) * (1 + Number(M.adminPct || 0) / 100);
-    const n = grp ? Math.round(Number(grp.participants) || 0) : 0;
+    // Cap at the same ceiling the backend applies, or the page would quote a
+    // figure Stripe will not charge: an admin may save up to 2000 members,
+    // but a subscription is capped at MAX_HEADCOUNT.
+    const n = grp ? Math.min(PAY_MAX_HEADCOUNT, Math.round(Number(grp.participants) || 0)) : 0;
     const total = $("#payMonthlyTotal"), btn = $('#payGrid [data-checkout="subscription"]');
     if (total) {
       total.innerHTML = !grp
@@ -1022,7 +1064,10 @@
           ? `<b>${n} ${n === 1 ? esc(I18.t("member")) : esc(I18.t("members"))} × ${esc(usd(each))} = ${esc(usd(n * each))} ${esc(I18.t("per month"))}</b><br><span>${esc(I18.t("This is what you will be charged every month. It stays at this amount even if the group's size changes later."))}</span>`
           : esc(I18.t("That group has no headcount on file yet, so a monthly amount cannot be worked out."));
     }
-    if (btn) btn.disabled = !(grp && n > 0);
+    // aria-disabled rather than disabled: a disabled button leaves the tab
+    // order, so a keyboard user never finds it and never learns why it is
+    // inert. This one stays reachable and says what it needs when pressed.
+    if (btn) btn.setAttribute("aria-disabled", String(!(grp && n > 0)));
 
     // A month's worth, paid once. Same arithmetic as the subscription, but
     // nothing recurring and nothing to cancel. Hidden when there is no group,
@@ -1031,17 +1076,23 @@
     const opt = $("#payMonthOpt"), lbl = $("#payMonthOptLabel");
     if (opt && lbl) {
       const offer = payMonthAmount >= PAY_MIN && payMonthAmount <= PAY_MAX;
-      opt.hidden = !offer;
-      if (offer) lbl.textContent = `${I18.t("Cover one month")} — ${usd(payMonthAmount)}`;
       const radio = opt.querySelector("input");
-      // If the group changes and this option goes away while chosen, fall back
-      // to a preset rather than leaving nothing selected.
-      if (!offer && radio.checked) {
-        radio.checked = false;
-        const back = $$('#payGrid [name="payAmt"]').find((r) => r.value === String(PAY_PRESETS[1]));
-        if (back) back.checked = true;
-        const other = $("#payAmtOther"); if (other) { other.disabled = true; other.value = ""; }
+      const back = $$('#payGrid [name="payAmt"]').find((r) => r.value === String(PAY_PRESETS[1]));
+      if (!offer) {
+        // Hiding a focused element strands focus on <body> and loses the
+        // user's place, so move it somewhere sensible first. Then fall back to
+        // a preset rather than leaving nothing chosen.
+        const hadFocus = document.activeElement === radio;
+        if (radio.checked) {
+          radio.checked = false;
+          if (back) back.checked = true;
+          const other = $("#payAmtOther"); if (other) { other.disabled = true; other.value = ""; }
+        }
+        if (hadFocus && back) back.focus();
+      } else {
+        lbl.textContent = `${I18.t("Cover one month, paid once")} — ${usd(payMonthAmount)}`;
       }
+      opt.hidden = !offer;
     }
   }
 

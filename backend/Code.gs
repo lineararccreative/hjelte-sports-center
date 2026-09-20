@@ -648,9 +648,27 @@ function checkoutPayload_(o) {
   return p;
 }
 function createCheckout(d) {
+  // Apps Script gives doPost no caller address, so the hourly cap is shared by
+  // the whole public: anyone could burn it in seconds and shut off
+  // contributions for the rest of the hour. A tighter per-minute cap underneath
+  // it means a burst costs everyone a minute, not the best part of an hour.
   throttleGlobal("createCheckout", 120);
+  throttle("cc:min:" + Math.floor(Date.now() / 60000), 10, 60);
+  try {
+    return createCheckout_(d);
+  } catch (err) {
+    // Anything we raised deliberately is meant for the donor. Anything else is
+    // plumbing — a renamed sheet, Stripe unreachable — and saying so mid-payment
+    // helps nobody, so it is logged and replaced.
+    if (err && err.expected) throw new Error(err.message);
+    Logger.log("createCheckout failed: " + (err && err.stack ? err.stack : err));
+    throw new Error("Something went wrong setting that up. Please try again in a moment.");
+  }
+}
+function donorError_(msg) { const e = new Error(msg); e.expected = true; return e; }
+function createCheckout_(d) {
   const key = scriptProp_("STRIPE_SECRET_KEY");
-  if (!key) throw new Error("Contributions are not switched on yet.");
+  if (!key) throw donorError_("Contributions are not switched on yet.");
   const mode = d.mode === "subscription" ? "subscription" : "payment";
   const grp = d.groupId ? rows("Groups").find((g) => String(g.id) === String(d.groupId)) : null;
   const proj = d.projectId ? rows("Projects").find((p) => String(p.id) === String(d.projectId)) : null;
@@ -667,20 +685,20 @@ function createCheckout(d) {
   };
   if (mode === "subscription") {
     const priceId = scriptProp_("STRIPE_PRICE_MONTHLY");
-    if (!priceId) throw new Error("Monthly contributions are not switched on yet.");
-    if (!grp) throw new Error("Choose a group for a monthly contribution.");
+    if (!priceId) throw donorError_("Monthly contributions are not switched on yet.");
+    if (!grp) throw donorError_("Choose a group for a monthly contribution.");
     // The headcount comes from the admin's row, never from the caller, and it
     // is fixed onto the subscription here. An admin editing the roster later
     // does not change what somebody has already agreed to pay.
     const n = Math.round(Number(grp.participants) || 0);
-    if (n < 1) throw new Error("That group has no headcount on file yet. An admin can add one.");
+    if (n < 1) throw donorError_("That group has no headcount on file yet. An admin can add one.");
     o.priceId = priceId;
     o.quantity = Math.min(MAX_HEADCOUNT, n);
     o.metadata.headcount = String(o.quantity);
   } else {
     const cents = Math.round(Number(d.amountCents) || 0);
-    if (!(cents >= ONETIME_MIN_CENTS)) throw new Error("The smallest contribution is $" + (ONETIME_MIN_CENTS / 100) + ".");
-    if (cents > ONETIME_MAX_CENTS) throw new Error("For more than $" + (ONETIME_MAX_CENTS / 100) + ", please get in touch so we can thank you properly.");
+    if (!(cents >= ONETIME_MIN_CENTS)) throw donorError_("The smallest contribution is $" + (ONETIME_MIN_CENTS / 100) + ".");
+    if (cents > ONETIME_MAX_CENTS) throw donorError_("For more than $" + (ONETIME_MAX_CENTS / 100) + ", please get in touch so we can thank you properly.");
     o.amountCents = cents;
     o.productName = "Hjelte Community Maintenance — one-time contribution";
   }
@@ -697,7 +715,7 @@ function createCheckout(d) {
     // Stripe's error can quote the request back; log it, never return it to
     // the browser.
     Logger.log("Stripe checkout failed " + code + ": " + String(res.getContentText()).slice(0, 500));
-    throw new Error("Stripe could not start that contribution. Please try again.");
+    throw donorError_("Stripe could not start that contribution. Please try again.");
   }
   return { ok: true, url: out.url };
 }
