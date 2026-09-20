@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/img/hero-aerial.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="css/styles.css?v=2026-09-19o">
+  <link rel="stylesheet" href="css/styles.css?v=2026-09-19p">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -380,7 +380,7 @@
       <li><i class="sw sw-bleacher"></i>Bleachers behind each home plate</li>
     </ul>
 
-    <div class="map-chips reveal" id="mapChips" aria-label="Map locations"></div>
+    <div class="map-chips reveal" id="mapChips" role="group" aria-label="Map locations"></div>
   </div>
 </section>
 
@@ -407,8 +407,8 @@
       <button type="button" class="sv-btn" data-view="list" aria-pressed="false">Day list</button>
     </div>
 
-    <div class="week-grid reveal" id="weekGrid" aria-label="Weekly schedule grid"></div>
-    <div class="week-list reveal" id="weekList" aria-label="Weekly schedule list"></div>
+    <div class="week-grid reveal" id="weekGrid" role="region" tabindex="0" aria-label="Weekly schedule grid — scroll sideways for more days"></div>
+    <div class="week-list reveal" id="weekList" role="region" aria-label="Weekly schedule list"></div>
     <p class="empty-note" id="scheduleEmpty" hidden>No activities match these filters.</p>
 
     <div class="legend reveal" id="legend"></div>
@@ -724,7 +724,7 @@
       <h3>Chip in when you're ready</h3>
       <p class="step-lead">Contributions are handled on Stripe's own secure page — card details never touch this site. You pick the amount there.</p>
       <div class="pay-grid" id="payGrid"></div>
-      <div class="rate-note" id="rateNote"></div>
+      <div class="rate-note" id="rateNote" role="status" aria-live="polite"></div>
       <p class="fine-print">Hjelte community members administer community contributions for Hjelte projects and upkeep. A 5% share of each contribution covers administration and processing; the rest goes to the fields. Contributions are not payments to the City of Los Angeles and do not grant permit status or exclusive use of any field.</p>
     </div>
   </div>
@@ -820,8 +820,8 @@
 
 <button class="to-top" id="toTop" aria-label="Back to top">↑</button>
 
-<script src="js/data.js?v=2026-09-19o"></script>
-<script src="js/i18n.js?v=2026-09-19o"></script>
-<script src="js/app.js?v=2026-09-19o"></script>
+<script src="js/data.js?v=2026-09-19p"></script>
+<script src="js/i18n.js?v=2026-09-19p"></script>
+<script src="js/app.js?v=2026-09-19p"></script>
 </body>
 </html>

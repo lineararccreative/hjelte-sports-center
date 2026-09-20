@@ -518,20 +518,36 @@
   }
 
   /* ---------------- forms ---------------- */
+  /* Error ids are namespaced by form so two forms on the page can both have an
+     "email" field, and the field's own help text is kept alongside the error
+     rather than replaced by it. */
+  function clearFieldErrors(form) {
+    $$(".field-error", form).forEach((n) => n.remove());
+    $$("[data-describedby-base]", form).forEach((f) => {
+      const base = f.getAttribute("data-describedby-base");
+      if (base) f.setAttribute("aria-describedby", base); else f.removeAttribute("aria-describedby");
+      f.removeAttribute("data-describedby-base");
+    });
+  }
+  function markFieldError(form, f) {
+    const lbl = f.closest("label") || f.closest("fieldset") || f.parentElement;
+    const id = `${form.id || "form"}-${f.name || "f"}-err`;
+    if (!document.getElementById(id)) {
+      lbl.insertAdjacentHTML("beforeend", `<span class="field-error" id="${id}">${esc(f.validationMessage)}</span>`);
+    }
+    if (!f.hasAttribute("data-describedby-base")) f.setAttribute("data-describedby-base", f.getAttribute("aria-describedby") || "");
+    const base = f.getAttribute("data-describedby-base");
+    f.setAttribute("aria-describedby", base ? `${base} ${id}` : id);
+  }
   function handleForm(form, statusEl, buildSubject, buildBody) {
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      $$(".field-error", form).forEach((n) => n.remove());
+      clearFieldErrors(form);
       if (form.id === "groupForm") captchaOk(form);
       $$("input, select, textarea", form).forEach((i) => { i.classList.add("touched"); i.setAttribute("aria-invalid", String(!i.checkValidity())); });
       if (!form.checkValidity()) {
         const bad = $$(":invalid", form).filter((f) => f.name);
-        bad.forEach((f) => {
-          const lbl = f.closest("label") || f.parentElement;
-          const id = (f.name || "f") + "-err";
-          f.setAttribute("aria-describedby", id);
-          lbl.insertAdjacentHTML("beforeend", `<span class="field-error" id="${id}">${esc(f.validationMessage)}</span>`);
-        });
+        bad.forEach((f) => markFieldError(form, f));
         statusEl.setAttribute("role", "alert");
         statusEl.textContent = I18.t("Please complete the required fields.") + ` (${bad.length})`;
         statusEl.classList.add("is-error");
@@ -611,15 +627,22 @@
   const svgNS = "http://www.w3.org/2000/svg";
   const W = 1000, H = 700;
   function svgEl(tag, attrs) { const n = document.createElementNS(svgNS, tag); Object.entries(attrs).forEach(([k, v]) => n.setAttribute(k, v)); return n; }
+  // Below 1024 the map is drawn at a third to two-thirds of its design size,
+  // so the few long labels get a shorter form there rather than colliding.
+  // Kept in step with the label font sizes in the stylesheet.
+  const MAP_NARROW_MQ = "(max-width: 1023.98px)";
+  const mapNarrow = () => window.matchMedia(MAP_NARROW_MQ).matches;
   function renderMap() {
     const shapes = $("#mapShapes"), pins = $("#mapPins");
+    const narrow = mapNarrow();
     shapes.innerHTML = pins.innerHTML = "";
     D.mapLocations.forEach((loc) => {
       const cx = loc.x / 100 * W, cy = loc.y / 100 * H;
       const g = svgEl("g", { class: "hotspot", tabindex: "0", role: "button", "aria-label": loc.name, "data-id": loc.id });
       if (loc.sport) g.style.setProperty("--sport-fill", sport(loc.sport).color + "66");
       const lx = (loc.lx !== undefined ? loc.lx : loc.x) / 100 * W, ly = (loc.ly !== undefined ? loc.ly : loc.y) / 100 * H;
-      const shortName = loc.short !== undefined ? loc.short : loc.name.replace("Softball ", "").replace(" (west lot)", "").replace(" & Picnic Area", "").replace("Los Angeles ", "");
+      const fullShort = loc.short !== undefined ? loc.short : loc.name.replace("Softball ", "").replace(" (west lot)", "").replace(" & Picnic Area", "").replace("Los Angeles ", "");
+      const shortName = narrow && loc.shortSm !== undefined ? loc.shortSm : fullShort;
       // A location can carry an emoji badge; when it has no short name the
       // badge stands alone (the soccer areas), otherwise it sits above the label.
       const addLabel = (gx, gy) => {
@@ -645,12 +668,21 @@
         if (loc.id === "outfield") shapes.prepend(g); else shapes.appendChild(g);
       } else {
         const glyph = { Entrance: "M12 4v16M5 12l7 7 7-7", Restrooms: "M9 5a2 2 0 1 0 0 .01M15 5a2 2 0 1 0 0 .01M7 9h4v6l1 5M17 9h-4l-1 6-1 5", Seating: "M4 9h16v3H4zM6 12v7M18 12v7M4 15h16", Path: "M6 20c4-6 8-2 12-8" }[loc.kind] || "M12 8v8M8 12h8";
-        const pinLabel = loc.kind === "Entrance" ? (loc.id === "accessRoad" ? "Access road" : "Field entrance") : loc.name.replace(" & Storage", "").replace(" & Path", "").replace(" & Lights", "");
+        const pinLabel = narrow && loc.shortSm !== undefined ? loc.shortSm
+          : loc.kind === "Entrance" ? (loc.id === "accessRoad" ? "Access road" : "Field entrance")
+          : loc.name.replace(" & Storage", "").replace(" & Path", "").replace(" & Lights", "");
         const pg = svgEl("g", { transform: `translate(${cx} ${cy})` });
-        pg.appendChild(svgEl("circle", { class: "pin-body", r: 15 }));
-        pg.appendChild(svgEl("path", { class: "pin-glyph", d: glyph, transform: "translate(-9 -9) scale(.75)", fill: "none", stroke: "#1C1F22", "stroke-width": 2.2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+        // An invisible circle carries the tap target so the pin art can stay
+        // small while still clearing 44 px on a phone (sized in CSS per width).
+        pg.appendChild(svgEl("circle", { class: "pin-hit", r: 26 }));
+        // The art sits in its own group so a phone can scale it about the pin
+        // centre without disturbing the hit area or the label.
+        const art = svgEl("g", { class: "pin-art" });
+        art.appendChild(svgEl("circle", { class: "pin-body", r: 15 }));
+        art.appendChild(svgEl("path", { class: "pin-glyph", d: glyph, transform: "translate(-9 -9) scale(.75)", fill: "none", stroke: "#1C1F22", "stroke-width": 2.2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+        pg.appendChild(art);
         g.appendChild(pg);
-        const t = svgEl("text", { "aria-hidden": "true", x: cx, y: cy + 32, "text-anchor": "middle" }); t.textContent = pinLabel; g.appendChild(t);
+        const t = svgEl("text", { class: "pin-label", "aria-hidden": "true", x: cx, y: cy + 32, "text-anchor": "middle" }); t.textContent = pinLabel; g.appendChild(t);
         pins.appendChild(g);
       }
       g.addEventListener("click", () => selectLocation(loc.id));
@@ -680,9 +712,11 @@
     const note = $("#mapModeNote");
     if (note) { note.textContent = MAP_MODES[mode]; I18.apply(); }
   }
+  let activeLoc = null;
   function selectLocation(id) {
     const loc = D.mapLocations.find((l) => l.id === id);
     if (!loc) return;
+    activeLoc = id;
     $$(".hotspot").forEach((h) => h.classList.toggle("is-active", h.dataset.id === id));
     $$("#mapChips .chip").forEach((c) => c.classList.toggle("is-active", c.dataset.loc === id));
     const s = loc.sport ? sport(loc.sport) : null;
@@ -700,6 +734,23 @@
     const f = $("[data-fac]", $("#mapCard")); if (f) f.addEventListener("click", () => setScheduleFilter("facility", f.dataset.fac));
     if (window.innerWidth < 1024) $("#mapCard").scrollIntoView({ behavior: scrollBehavior(), block: "nearest" });
   }
+
+  /* Crossing the phone/desktop line swaps the short labels, so redraw once and
+     put back whatever was selected and whichever mode was showing. */
+  (function watchMapWidth() {
+    const mq = window.matchMedia(MAP_NARROW_MQ);
+    const redraw = () => {
+      const mode = ($(".map-modes .mode-btn.is-active") || {}).dataset;
+      renderMap();
+      setMapMode(mode && mode.mode ? mode.mode : "open");
+      if (activeLoc) {
+        $$(".hotspot").forEach((h) => h.classList.toggle("is-active", h.dataset.id === activeLoc));
+        $$("#mapChips .chip").forEach((c) => c.classList.toggle("is-active", c.dataset.loc === activeLoc));
+      }
+    };
+    if (mq.addEventListener) mq.addEventListener("change", redraw);
+    else if (mq.addListener) mq.addListener(redraw);
+  })();
 
   /* ---------------- featured ---------------- */
   function renderFeatured() {
@@ -883,7 +934,7 @@
         <h4>${esc(o.title)}</h4>
         <p>${esc(o.text)}</p>
         ${url
-          ? `<a class="btn btn-primary btn-sm" href="${esc(url)}" target="_blank" rel="noopener">${esc(o.cta)}</a>`
+          ? `<a class="btn btn-primary btn-sm" href="${esc(url)}" target="_blank" rel="noopener">${esc(o.cta)}<span class="sr-only"> (opens Stripe in a new tab)</span></a>`
           : `<p class="pay-pending">${I18.t("Opening soon — join the list above and we'll email you the moment contributions open.")}</p>`}
       </article>`;
     }).join("");
@@ -933,17 +984,13 @@
     $("#memberSizeWrap input").addEventListener("input", updateRate);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
-      $$(".field-error", form).forEach((n) => n.remove());
+      clearFieldErrors(form);
       const cf = form.querySelector('[name="captcha"]');
       cf.setCustomValidity(Number(String(cf.value).trim()) === mCaptcha.a + mCaptcha.b ? "" : I18.t("That answer is not right — please try the sum again."));
       $$("input, select, textarea", form).forEach((i) => { i.classList.add("touched"); i.setAttribute("aria-invalid", String(!i.checkValidity())); });
       if (!form.checkValidity()) {
         const bad = $$(":invalid", form).filter((f) => f.name);
-        bad.forEach((f) => {
-          const lbl = f.closest("label") || f.closest("fieldset") || f.parentElement;
-          const id = "m-" + (f.name || "f") + "-err";
-          if (!document.getElementById(id)) lbl.insertAdjacentHTML("beforeend", `<span class="field-error" id="${id}">${esc(f.validationMessage)}</span>`);
-        });
+        bad.forEach((f) => markFieldError(form, f));
         statusEl.textContent = I18.t("Please complete the required fields.") + ` (${bad.length})`;
         statusEl.classList.add("is-error");
         if (bad[0]) bad[0].focus();
@@ -984,8 +1031,12 @@
   /* One <dialog> serves every zoomable image: it lives in the top layer, so no
      stacking context can clip it, and Esc / backdrop click close it for free. */
   const lb = $("#lightbox"), lbImg = $("#lightboxImg"), lbCap = $("#lightboxCap");
+  // Remembered so Esc or the close button hands focus back to the thumbnail
+  // the reader came from, rather than dropping it at the top of the page.
+  let lbReturn = null;
   function openLightbox(src, caption, alt) {
     if (!lb || !src) return;
+    lbReturn = document.activeElement;
     lbImg.src = src; lbImg.alt = alt || caption || "";
     lbCap.textContent = caption || "";
     lbCap.hidden = !caption;
@@ -996,6 +1047,8 @@
     if (!lb) return;
     if (typeof lb.close === "function") lb.close(); else lb.removeAttribute("open");
     lbImg.removeAttribute("src");
+    if (lbReturn && document.contains(lbReturn)) lbReturn.focus();
+    lbReturn = null;
   }
   if (lb) {
     document.addEventListener("click", (e) => {

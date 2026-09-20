@@ -1035,17 +1035,6 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
 .member-form .form-grid label[hidden] { display: none; }
 .member-form .human-check input { max-width: 140px; }
 
-.check-grid { border: 0; padding: 0; margin: 0; min-width: 0; }
-.check-grid legend { font-size: .78rem; font-weight: 600; color: var(--ink-3); margin-bottom: 10px; padding: 0; }
-.check-grid > div { display: grid; gap: 8px; }
-.check-item { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;
-  border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: #fff; cursor: pointer;
-  transition: border-color .18s, background .18s; }
-.check-item:hover { border-color: var(--ink-3); }
-.check-item:has(input:checked) { border-color: var(--grass); background: var(--grass-light); }
-.check-item input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--grass); }
-.check-item b { display: block; font-family: var(--body); font-size: .92rem; font-weight: 600; }
-.check-item small { display: block; color: var(--muted); font-size: .8rem; line-height: 1.45; margin-top: 2px; }
 
 .contribute-step { margin-top: 40px; padding-top: 32px; border-top: 1px solid var(--line); }
 .pay-grid { display: grid; gap: 14px; margin: 18px 0 16px; }
@@ -1056,3 +1045,73 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
 .pay-card h4 { font-family: var(--display); font-size: 1.2rem; margin-bottom: 6px; }
 .pay-card p { font-size: .92rem; color: var(--ink-3); margin-bottom: 14px; line-height: 1.6; }
 .pay-pending { font-size: .86rem; color: var(--muted); font-style: normal; margin: 0; }
+
+/* =====================================================================
+   Facility map on a phone
+   ---------------------------------------------------------------------
+   The map is the centrepiece of the page, so on a phone it gets the full
+   screen width rather than sitting inside the page gutter, and the labels,
+   emoji badges and pin targets are scaled up to stay readable and tappable
+   at that size. Every selector here is scoped to a phone width so the
+   desktop map is untouched.
+   ===================================================================== */
+.pin-hit { fill: transparent; r: 40px; }
+@media (max-width: 1023.98px) { .pin-hit { r: 56px; } }
+
+@media (max-width: 767.98px) {
+  /* full-bleed: 40px of gutter back is ~12% more map */
+  .map-canvas { margin-left: calc(var(--gutter) * -1); margin-right: calc(var(--gutter) * -1);
+    border-radius: 0; padding: 6px 6px 0; }
+  .facility-svg { border-radius: 14px; }
+  .map-credit { font-size: .72rem; margin: 8px 12px; }
+
+  /* the detail card belongs under the map on a phone, not floating over it */
+  .map-card { position: static; padding: 18px; }
+
+  /* readable at ~0.35 px per SVG unit */
+  .hotspot text { font-size: 36px; }
+  .hotspot .map-emoji { font-size: 46px; }
+  .map-dim-labels text { font-size: 20px; }
+  .map-dim-labels rect { transform: scale(1.7); }
+  .map-road-label { font-size: 22px; }
+  .map-scale text { font-size: 18px; }
+
+  /* pins: a 120-unit invisible target (~44 px) and visibly larger art */
+  .pin-art { transform: scale(1.8); }
+  .pin-hit { r: 62px; }
+  .hotspot text.pin-label { transform: translateY(26px); }
+}
+@media (max-width: 479.98px) {
+  .hotspot text { font-size: 40px; }
+  .hotspot .map-emoji { font-size: 50px; }
+  .pin-hit { r: 74px; }
+  .hotspot text.pin-label { transform: translateY(30px); }
+}
+/* the map loses width to the detail card between 1024 and 1280, so the labels
+   are drawn a little larger there to stay readable */
+@media (min-width: 1024px) and (max-width: 1279.98px) {
+  .hotspot text { font-size: 24px; }
+  .hotspot .map-emoji { font-size: 32px; }
+}
+
+/* "Who's playing right now?" — three equal buttons instead of a ragged wrap */
+@media (max-width: 599.98px) {
+  .map-modes { display: block; margin-bottom: 12px; }
+  .map-modes-label { display: block; margin-bottom: 8px; }
+  .map-mode-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px;
+    width: 100%; border-radius: 18px; }
+  .mode-btn { padding: 8px 6px; font-size: .78rem; line-height: 1.25; border-radius: 14px;
+    display: grid; place-items: center; text-align: center; }
+}
+
+/* 320 px: long button labels were forcing the page a few px wider than the screen */
+@media (max-width: 599.98px) {
+  .member-flow, .pay-grid { grid-template-columns: minmax(0, 1fr); }
+  .member-step, .pay-card { min-width: 0; }
+  .pay-card { padding: 18px; }
+  .pay-card .btn, .member-form .btn-lg { width: 100%; }
+  .btn-lg { padding-left: 18px; padding-right: 18px; }
+}
+
+/* the sideways scrollers are reachable by keyboard, so show where focus lands */
+#weekGrid:focus-visible, .map-chips:focus-visible { outline: 3px solid var(--gold-dark); outline-offset: 3px; border-radius: 12px; }

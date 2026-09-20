@@ -299,10 +299,10 @@ window.HJELTE = {
      shape: "diamond" | "rect" | "pitch" | "pin"
      ------------------------------------------------------------------ */
   mapLocations: [
-    { id: "outfield", name: "Shared Outfield", short: "Shared Outfield", kind: "Open Turf", sport: "soccer", shape: "rect", x: 31.6, y: 10.1, w: 56.8, h: 81.1, lx: 38.7, ly: 33.1, facility: "outfield",
+    { id: "outfield", name: "Shared Outfield", short: "Shared Outfield", shortSm: "Outfield", kind: "Open Turf", sport: "soccer", shape: "rect", x: 31.6, y: 10.1, w: 56.8, h: 81.1, lx: 38.7, ly: 33.1, facility: "outfield",
       fieldInfo: "One continuous grass outfield, 544 ft across the top home-plate span and 543 ft down the side. Everything else on this map sits inside it.", uses: "Soccer, ultimate, fitness, family days and warm-ups wherever a marked area is not in use.", accessibility: "Level grass throughout; firm dirt road around the outside." },
 
-    { id: "cricket", name: "Los Angeles Cricket Ground", short: "Cricket Ground", kind: "Cricket Ground", sport: "cricket", shape: "circle", x: 59.8, y: 50.5, r: 21.9, lx: 59.8, ly: 37, facility: "cricket",
+    { id: "cricket", name: "Los Angeles Cricket Ground", short: "Cricket Ground", shortSm: "Cricket", kind: "Cricket Ground", sport: "cricket", shape: "circle", x: 59.8, y: 50.5, r: 21.9, lx: 59.8, ly: 37, facility: "cricket",
       fieldInfo: "420 ft playing circle (210 ft radius) centred between the four home plates, with a 20 × 80 ft prepared natural-turf pitch at its middle. The boundary is roped on match days.", uses: "Permitted cricket activity: youth coaching, practice and community matches.", accessibility: "Grass approach from the field entrance; stay outside the rope while play is on." },
     { id: "pitchZone", name: "Protected Pitch Zone", short: "Protected zone", kind: "Protected Area", sport: "cricket", shape: "rect", x: 57.18, y: 42.29, w: 5.22, h: 16.41, noLabel: true, facility: "cricket",
       fieldInfo: "The prepared 20 × 80 ft pitch plus a 15 ft buffer on every side — a 50 × 110 ft protected rectangle at the centre of the ground.", uses: "No activities are scheduled here at any time. It opens only for cricket practice and matches, so the prepared turf stays playable.", accessibility: "Please walk around this rectangle rather than across it." },
@@ -329,7 +329,7 @@ window.HJELTE = {
       fieldInfo: "Unpaved lot along the west side of the field.", uses: "Visitor parking, team drop-off.", accessibility: "Level; short walk to the field entrance." },
     { id: "restrooms", name: "Restrooms & Storage", short: "Restrooms", kind: "Restrooms", sport: null, shape: "pin", x: 27.1, y: 55.6,
       fieldInfo: "Building between the parking lot and the field.", uses: "Open during facility hours.", accessibility: "Level approach from parking." },
-    { id: "entranceMain", name: "Field Entrance (from parking)", short: "Entrance", kind: "Entrance", sport: null, shape: "pin", x: 14, y: 7,
+    { id: "entranceMain", name: "Field Entrance (from parking)", short: "Entrance", shortSm: "Entrance", kind: "Entrance", sport: null, shape: "pin", x: 14, y: 7,
       fieldInfo: "Main pedestrian entry, at the north end of the parking lot.", uses: "Arrival, drop-off, wayfinding.", accessibility: "Firm surface from the parking lot to the grass edge." }
   ],
 
