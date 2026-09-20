@@ -120,7 +120,12 @@
   function actionBtns(editAction, delAction, id, name) {
     const n = name ? ` ${esc(String(name))}` : "";
     const i = esc(String(id == null ? "" : id));
-    return `<td class="actions"><button class="btn btn-text" data-act="${editAction}" data-id="${i}" aria-label="Edit${n}">Edit</button><button class="btn btn-text btn-danger" data-act="${delAction}" data-id="${i}" aria-label="Delete${n}">Delete</button></td>`;
+    // Duplicate exists for every record type whose editor is "edit<Thing>".
+    const dupAction = editAction.replace(/^edit/, "dup");
+    const dup = ACTIONS[dupAction]
+      ? `<button class="btn btn-text" data-act="${dupAction}" data-id="${i}" aria-label="Duplicate${n}">Duplicate</button>`
+      : "";
+    return `<td class="actions"><button class="btn btn-text" data-act="${editAction}" data-id="${i}" aria-label="Edit${n}">Edit</button>${dup}<button class="btn btn-text btn-danger" data-act="${delAction}" data-id="${i}" aria-label="Delete${n}">Delete</button></td>`;
   }
   function bindActions() {
     $$("#panel [data-act]").forEach((b) => b.addEventListener("click", () => ACTIONS[b.dataset.act](b.dataset.id)));
@@ -253,12 +258,22 @@
 
   /* ---------------- actions ---------------- */
   const byId = (list, id) => (data[list] || []).find((x) => x.id === id) || {};
+  /* Duplicating opens the editor on an existing record's values but saves it as
+     a new one: a blank id makes the backend mint a fresh one. */
+  const newId = (id, dup) => (dup ? "" : (id || ""));
+  const drawerTitle = (id, dup, noun, addLabel) => (dup ? "Duplicate " + noun : id ? "Edit " + noun : addLabel);
   const ACTIONS = {
+    dupSchedule: (id) => ACTIONS.editSchedule(id, true),
+    dupEvent: (id) => ACTIONS.editEvent(id, true),
+    dupUpdate: (id) => ACTIONS.editUpdate(id, true),
+    dupWork: (id) => ACTIONS.editWork(id, true),
+    dupGroup: (id) => ACTIONS.editGroup(id, true),
+    dupProject: (id) => ACTIONS.editProject(id, true),
     /* schedule */
     newSchedule: () => ACTIONS.editSchedule(null),
-    editSchedule: (id) => {
+    editSchedule: (id, dup) => {
       const r = id ? byId("schedule", id) : {};
-      openDrawer(id ? "Edit weekly block" : "Add weekly block",
+      openDrawer(drawerTitle(id, dup, "weekly block", "Add weekly block"),
         select("Group", "groupId", myGroups().map((g) => [g.id, g.name]).concat(isMaster() ? [["", "— facility-wide / maintenance —"]] : []), r.groupId) +
         select("Day", "day", DAYS.map((d, i) => [i, d]), r.day) +
         field("Start time", "start", r.start || "17:00", "time") + field("End time", "end", r.end || "19:00", "time") +
@@ -266,14 +281,14 @@
         select("Activity type", "type", TYPES, r.type || "Practice") +
         (isMaster() ? select("Category", "category", CATS, r.category) : "") +
         field("Title", "title", r.title, "text", "optional — defaults to the group name"),
-        (v) => api("saveSchedule", { data: Object.assign({ id: id || "" }, v) }));
+        (v) => api("saveSchedule", { data: Object.assign({ id: newId(id, dup) }, v) }));
     },
     delSchedule: (id) => confirm("Delete this weekly block?") && api("deleteSchedule", { data: { id } }).then(refresh).then(() => toast("Deleted.")).catch((e) => toast(e.message, true)),
     /* events */
     newEvent: () => ACTIONS.editEvent(null),
-    editEvent: (id) => {
+    editEvent: (id, dup) => {
       const r = id ? byId("events", id) : {};
-      openDrawer(id ? "Edit event" : "Add dated event",
+      openDrawer(drawerTitle(id, dup, "event", "Add dated event"),
         field("Title", "title", r.title) +
         field("Date", "date", r.date, "date") +
         field("Start time", "start", r.start || "09:00", "time") + field("End time", "end", r.end || "13:00", "time") +
@@ -282,26 +297,26 @@
         select("Activity type", "type", TYPES, r.type || "Special Event") +
         (isMaster() ? select("Category", "category", CATS, r.category) : "") +
         area("Note", "note", r.note, "one line shown on the card and in emails"),
-        (v) => api("saveEvent", { data: Object.assign({ id: id || "" }, v) }));
+        (v) => api("saveEvent", { data: Object.assign({ id: newId(id, dup) }, v) }));
     },
     delEvent: (id) => confirm("Delete this event?") && api("deleteEvent", { data: { id } }).then(refresh).then(() => toast("Deleted.")).catch((e) => toast(e.message, true)),
     /* updates */
     newUpdate: () => ACTIONS.editUpdate(null),
-    editUpdate: (id) => {
+    editUpdate: (id, dup) => {
       const u = id ? (data.updates || []).find((x) => x.id === id) || {} : {};
-      openDrawer(id ? "Edit update" : "Post an update",
+      openDrawer(drawerTitle(id, dup, "update", "Post an update"),
         field("Title", "title", u.title) + area("Message", "body", u.body) +
         (isMaster() ? select("Sport", "sport", [["all", "All sports"]].concat(D.sports.map((s) => [s.id, s.name])), u.sport || "all") : "") +
         select("Group", "groupId", (isMaster() ? [["", "— hub-wide —"]] : []).concat(myGroups().map((g) => [g.id, g.name])), u.groupId) +
         field("Title (Español)", "title_es", u.title_es, "text", "optional") + area("Message (Español)", "body_es", u.body_es, "optional — English shows if blank"),
-        (v) => api("postUpdate", { data: Object.assign({ id: id || "" }, v) }));
+        (v) => api("postUpdate", { data: Object.assign({ id: newId(id, dup) }, v) }));
     },
     delUpdate: (id) => confirm("Delete this update?") && api("deleteUpdate", { data: { id } }).then(refresh).then(() => toast("Deleted.")).catch((e) => toast(e.message, true)),
     /* work log */
     newWork: () => ACTIONS.editWork(null),
-    editWork: (id) => {
+    editWork: (id, dup) => {
       const w = id ? (data.worklog || []).find((x) => x.id === id) || {} : {};
-      openDrawer(id ? "Edit work entry" : "Log work at the park",
+      openDrawer(drawerTitle(id, dup, "work entry", "Log work at the park"),
         field("Date", "date", w.date || new Date().toISOString().slice(0, 10), "date") +
         area("What was done", "activity", w.activity) +
         select("Group", "groupId", (isMaster() ? [["", "— community volunteers —"]] : []).concat(myGroups().map((g) => [g.id, g.name])), w.groupId) +
@@ -309,17 +324,20 @@
         select("Area", "area", D.config.projectAreas, w.area) +
         field("People-hours", "hours", w.hours, "number") + field("Number of volunteers", "volunteers", w.volunteers, "number") +
         field("Materials / services", "materials", w.materials) + field("Estimated value ($)", "value", w.value, "number"),
-        (v) => api("addWorkLog", { data: Object.assign({ id: id || "" }, v) }));
+        (v) => api("addWorkLog", { data: Object.assign({ id: newId(id, dup) }, v) }));
     },
     verifyWork: (id) => api("verifyWorkLog", { data: { id, verified: true } }).then(refresh).then(() => toast("Verified.")).catch((e) => toast(e.message, true)),
     delWork: (id) => confirm("Delete this work entry?") && api("deleteWorkLog", { data: { id } }).then(refresh).then(() => toast("Deleted.")).catch((e) => toast(e.message, true)),
     /* groups */
     newGroup: () => ACTIONS.editGroup(null),
-    editGroup: (id) => {
+    editGroup: (id, dup) => {
       const g = id ? myGroups().find((x) => x.id === id) || {} : {};
       const dayChecks = `<fieldset class="span-2"><legend>Typical days</legend><div class="check-row">${DAYS.map((d, i) => `<label><input type="checkbox" name="days" data-multi="1" value="${i}"${(g.days || []).indexOf(i) !== -1 ? " checked" : ""}> ${DAYS_S[i]}</label>`).join("")}</div></fieldset>`;
-      openDrawer(id ? "Edit group" : "Add group",
-        field("Name", "name", g.name) + field("Short code", "short", g.short, "text", "2–3 letters for the logo tile") +
+      // A new group's id is the slug of its name, so a duplicate keeps the
+      // original name it would overwrite the row it was copied from.
+      const gName = dup ? (g.name ? g.name + " (copy)" : "") : g.name;
+      openDrawer(drawerTitle(id, dup, "group", "Add group"),
+        field("Name", "name", gName) + field("Short code", "short", g.short, "text", "2–3 letters for the logo tile") +
         select("Sport", "sport", D.sports.map((s) => [s.id, s.name]), g.sport) +
         field("Program type", "programType", g.programType) +
         select("Ages", "ages", ["Youth", "Mixed"], g.ages) + select("Level", "level", ["Recreational", "Competitive"], g.level) +
@@ -332,21 +350,21 @@
           `<label class="span-2 check-row"><input type="checkbox" name="paidPermit"${g.paidPermit ? " checked" : ""}> Permit fee paid</label>` +
           select("Directory section", "category", [["permitted", "Permitted organizations"], ["community", "Community & independent"]], g.category) +
           field("Badges", "badges", (g.badges || []).join("|"), "text", "separate with |") : ""),
-        (v) => { v.days = (v.days || []).map(Number); if (v.badges !== undefined) v.badges = String(v.badges).split("|").filter(Boolean); return api("saveGroup", { data: Object.assign({ id: id || "" }, v) }); });
+        (v) => { v.days = (v.days || []).map(Number); if (v.badges !== undefined) v.badges = String(v.badges).split("|").filter(Boolean); return api("saveGroup", { data: Object.assign({ id: newId(id, dup) }, v) }); });
     },
     delGroup: (id) => confirm("Remove this group from the directory?") && api("deleteGroup", { data: { id } }).then(refresh).then(() => toast("Removed.")).catch((e) => toast(e.message, true)),
     /* projects */
     newProject: () => ACTIONS.editProject(null),
-    editProject: (id) => {
+    editProject: (id, dup) => {
       const p = id ? (data.projects || []).find((x) => x.id === id) || {} : {};
-      openDrawer(id ? "Edit project" : "Add project",
+      openDrawer(drawerTitle(id, dup, "project", "Add project"),
         field("Title", "title", p.title) + select("Area", "area", D.config.projectAreas, p.area) +
         select("Status", "status", ["PROPOSED", "PLANNING", "FUNDRAISING", "IN PROGRESS", "COMPLETED"], p.status || "PROPOSED") +
         area("Description", "description", p.description) + area("Estimated impact", "impact", p.impact) +
         field("Lead organization", "lead", p.lead) + field("Partners", "partners", (p.partners || []).join("|"), "text", "separate with |") +
         field("Funding goal ($)", "goal", p.goal, "number") + field("Amount raised ($)", "raised", p.raised, "number") +
         field("Volunteer opportunities", "volunteer", p.volunteer) + field("Target date", "targetDate", p.targetDate, "month"),
-        (v) => { v.partners = String(v.partners || "").split("|").filter(Boolean); return api("saveProject", { data: Object.assign({ id: id || "" }, v) }); });
+        (v) => { v.partners = String(v.partners || "").split("|").filter(Boolean); return api("saveProject", { data: Object.assign({ id: newId(id, dup) }, v) }); });
     },
     delProject: (id) => confirm("Delete this project?") && api("deleteProject", { data: { id } }).then(refresh).then(() => toast("Deleted.")).catch((e) => toast(e.message, true)),
     /* submissions */

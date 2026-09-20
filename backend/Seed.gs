@@ -1131,6 +1131,55 @@ function applyFootballeros() {
   return "Footballeros added: 1 group row, " + SLOTS.length + " schedule rows.";
 }
 
+/* The three community groups added from the admin's notes: SL Lions on Sunday
+   twilight, and the Friday pair — Football Academy on the south soccer area
+   with the dads of those players on Diamond 2 the same hour.
+   Re-runnable: it clears its own rows first. */
+function applyCommunityGroups() {
+  const stamp = new Date().toISOString();
+  const base = { paidPermit: false, website: "", social: "", socialHandle: "", email: "",
+    description_es: "", logoUrl: "", status: "approved", example: false, updatedAt: stamp };
+  const GROUPS = [
+    Object.assign({}, base, {
+      id: "sl-lions", name: "Weekend Social Cricket \u2014 SL Lions", short: "SLL", sport: "cricket",
+      category: "community", permitStatus: "none", badges: "COMMUNITY GROUP|RECURRING COMMUNITY ACTIVITY",
+      programType: "Social cricket", ages: "Mixed", level: "Recreational", participants: 25,
+      days: "0", times: "Sun 5:00 \u2013 6:00 PM",
+      description: "A Sunday twilight social cricket group of about 25 players, on Diamond 1 from 5 to 6 PM. They play as an open community group with no permit on file, and anyone who turns up is welcome."
+    }),
+    Object.assign({}, base, {
+      id: "football-academy", name: "Football Academy", short: "FA", sport: "soccer",
+      category: "community", permitStatus: "none", badges: "COMMUNITY GROUP|YOUTH REC",
+      programType: "Youth football academy training", ages: "Youth", level: "Competitive", participants: 50,
+      days: "5", times: "Fri 5:00 \u2013 6:00 PM",
+      description: "Friday evening academy training for about 50 young players on the south soccer/football area."
+    }),
+    Object.assign({}, base, {
+      id: "dads-encino-softball", name: "Dads of Encino Adult Softball", short: "DES", sport: "softball",
+      category: "community", permitStatus: "none", badges: "COMMUNITY GROUP",
+      programType: "Adult social softball", ages: "Adult", level: "Recreational", participants: 25,
+      days: "5", times: "Fri 5:00 \u2013 6:00 PM",
+      description: "Fathers who started their own Friday game while their children train with the Football Academy across the field. Diamond 2, same hour, every week."
+    })
+  ];
+  const SLOTS = [
+    { day: 0, start: "17:00", end: "18:00", sport: "cricket",  groupId: "sl-lions",             facility: "sbA",     type: "Open Recreation", category: "community", title: "" },
+    { day: 5, start: "17:00", end: "18:00", sport: "soccer",   groupId: "football-academy",     facility: "soccerS", type: "Practice",        category: "community", title: "" },
+    { day: 5, start: "17:00", end: "18:00", sport: "softball", groupId: "dads-encino-softball", facility: "sbB",     type: "Open Recreation", category: "community", title: "" }
+  ];
+  ensureSheet_("Groups");
+  ensureSheet_("Schedule");
+  // the sample row these replace, and anything an earlier run of this added
+  deleteRowBy("Groups", "id", "ex-weekend-cricket");
+  rows("Schedule").forEach(function (r) {
+    if (String(r.groupId) === "ex-weekend-cricket" || String(r.id).indexOf("cg-") === 0) deleteRowBy("Schedule", "id", r.id);
+  });
+  GROUPS.forEach(function (g) { upsertRow("Groups", "id", g); });
+  SLOTS.forEach(function (e, i) { e.id = "cg-" + i; upsertRow("Schedule", "id", e); });
+  touch();
+  return "Community groups applied: " + GROUPS.length + " groups, " + SLOTS.length + " schedule rows.";
+}
+
 function applyContentUpdates() {
   applyProjects();
   ensureSheet_("Members");

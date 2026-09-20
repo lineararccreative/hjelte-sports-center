@@ -916,7 +916,9 @@
     return (D.projects || []).filter((p) => !isSample(p) && String(p.status || "").toUpperCase() !== "COMPLETED");
   }
   function payGroups() {
-    return (D.groups || []).filter((g) => !isSample(g) && g.name);
+    // alphabetical, to match the directory the list is drawn from
+    return (D.groups || []).filter((g) => !isSample(g) && g.name)
+      .sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { sensitivity: "base" }));
   }
   function renderPayPicker() {
     const ps = $("#payProject"), gs = $("#payGroup");

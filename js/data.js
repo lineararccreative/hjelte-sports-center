@@ -136,6 +136,22 @@ window.HJELTE = {
      ------------------------------------------------------------------ */
   groups: [
     {
+      id: "football-academy", name: "Football Academy", short: "FA", sport: "soccer",
+      category: "community", permitStatus: "none", paidPermit: false, badges: ["COMMUNITY GROUP", "YOUTH REC"],
+      programType: "Youth football academy training", ages: "Youth", level: "Competitive", participants: 50,
+      days: [5], times: "Fri 5:00 \u2013 6:00 PM",
+      website: "", social: "", socialHandle: "", email: "",
+      description: "Friday evening academy training for about 50 young players on the south soccer/football area."
+    },
+    {
+      id: "dads-encino-softball", name: "Dads of Encino Adult Softball", short: "DES", sport: "softball",
+      category: "community", permitStatus: "none", paidPermit: false, badges: ["COMMUNITY GROUP"],
+      programType: "Adult social softball", ages: "Adult", level: "Recreational", participants: 25,
+      days: [5], times: "Fri 5:00 \u2013 6:00 PM",
+      website: "", social: "", socialHandle: "", email: "",
+      description: "Fathers who started their own Friday game while their children train with the Football Academy across the field. Diamond 2, same hour, every week."
+    },
+    {
       id: "footballeros", name: "Footballeros", short: "Footballeros", sport: "soccer",
       category: "community", permitStatus: "none", paidPermit: false, badges: ["COMMUNITY GROUP"],
       programType: "Adult pickup soccer", ages: "Adult", level: "Recreational",
@@ -202,12 +218,12 @@ window.HJELTE = {
       description: "Early-morning conditioning sessions along the perimeter road and the west lawn."
     },
     {
-      id: "ex-weekend-cricket", name: "Weekend Social Cricket", short: "WC", sport: "cricket", example: true,
-      category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP", "RECURRING COMMUNITY ACTIVITY"],
-      programType: "Tape-ball social cricket", ages: "Mixed", level: "Recreational",
-      days: [6], times: "Sat 3:00 – 6:00 PM",
+      id: "sl-lions", name: "Weekend Social Cricket \u2014 SL Lions", short: "SLL", sport: "cricket",
+      category: "community", permitStatus: "none", paidPermit: false, badges: ["COMMUNITY GROUP", "RECURRING COMMUNITY ACTIVITY"],
+      programType: "Social cricket", ages: "Mixed", level: "Recreational", participants: 25,
+      days: [0], times: "Sun 5:00 \u2013 6:00 PM",
       website: "", social: "", socialHandle: "", email: "",
-      description: "Informal weekend tape-ball games on the west lawn. Families and first-timers encouraged."
+      description: "A Sunday twilight social cricket group of about 25 players, on Diamond 1 from 5 to 6 PM. They play as an open community group with no permit on file, and anyone who turns up is welcome."
     },
     {
       id: "ex-pickup-soccer", name: "Sunday Pickup Soccer", short: "PS", sport: "soccer", example: true,
@@ -240,6 +256,9 @@ window.HJELTE = {
      day: 0–6 · type: see activityTypes · category: permitted | community | open | maintenance
      ------------------------------------------------------------------ */
   schedule: [
+    { day: 5, start: "17:00", end: "18:00", sport: "soccer",   groupId: "football-academy",    facility: "soccerS", type: "Practice",          category: "community" },
+    { day: 5, start: "17:00", end: "18:00", sport: "softball", groupId: "dads-encino-softball", facility: "sbB",     type: "Open Recreation",   category: "community" },
+    { day: 0, start: "17:00", end: "18:00", sport: "cricket",  groupId: "sl-lions",            facility: "sbA",     type: "Open Recreation",   category: "community" },
     { day: 5, start: "18:00", end: "19:00", sport: "soccer",   groupId: "footballeros",        facility: "soccerW", type: "Open Recreation",   category: "community" },
     { day: 6, start: "18:00", end: "19:00", sport: "soccer",   groupId: "footballeros",        facility: "soccerW", type: "Open Recreation",   category: "community" },
     // Sunday
@@ -277,7 +296,6 @@ window.HJELTE = {
     { day: 6, start: "08:00", end: "12:00", sport: "soccer",   groupId: "ex-youth-soccer",     facility: "outfield",   type: "Game",              category: "permitted" },
     { day: 6, start: "09:00", end: "13:00", sport: "softball", groupId: "ex-youth-softball",   facility: "sbA",     type: "Game",              category: "permitted" },
     { day: 6, start: "13:00", end: "17:00", sport: "community",groupId: null,                  facility: "westLawn",    type: "Open Recreation",   category: "open", title: "Open lawn — general community use" },
-    { day: 6, start: "15:00", end: "18:00", sport: "cricket",  groupId: "ex-weekend-cricket",  facility: "westLawn",    type: "Open Recreation",   category: "community" },
     { day: 6, start: "09:00", end: "11:00", sport: "softball", groupId: null,                  facility: "sbC",     type: "League",            category: "permitted",  title: "Adult softball — league play" },
     { day: 6, start: "11:00", end: "13:00", sport: "community",groupId: null,                  facility: "outfield", type: "Maintenance",       category: "maintenance", title: "Field maintenance" },
     { day: 6, start: "13:00", end: "18:00", sport: "cricket",  groupId: "lac",                 facility: "cricket", type: "Practice",          category: "permitted" }

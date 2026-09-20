@@ -126,6 +126,7 @@ function rows(name) {
 }
 function appendRow(name, obj) {
   sheet(name).appendRow(SCHEMA[name].map((k) => toCell(k, obj[k])));
+  SpreadsheetApp.flush();
 }
 function findRowIndex(name, keyField, value) {
   const sh = sheet(name), last = sh.getLastRow();
@@ -140,11 +141,14 @@ function upsertRow(name, keyField, obj) {
   const vals = [SCHEMA[name].map((k) => toCell(k, obj[k]))];
   if (i === -1) sheet(name).appendRow(vals[0]);
   else sheet(name).getRange(i, 1, 1, SCHEMA[name].length).setValues(vals);
+  // Apps Script batches writes; flushing means an admin with the sheet open
+  // sees the row the moment the save returns, not whenever the batch lands.
+  SpreadsheetApp.flush();
   return obj;
 }
 function deleteRowBy(name, keyField, value) {
   const i = findRowIndex(name, keyField, value);
-  if (i !== -1) sheet(name).deleteRow(i);
+  if (i !== -1) { sheet(name).deleteRow(i); SpreadsheetApp.flush(); }
   return i !== -1;
 }
 function meta(key) {
