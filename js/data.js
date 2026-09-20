@@ -480,9 +480,10 @@ window.HJELTE = {
     /* Stripe Payment Links (live, Los Angeles Cricket account). Card details
        never touch this site; the project dropdown on Stripe's page becomes
        the memo on the contribution. */
+    /* Hjelte Community Hub Stripe account, separate from Los Angeles Cricket. */
     stripe: {
-      monthly: "https://buy.stripe.com/fZuaEXeXb0Pf5wmgBRabK02",
-      oneTime: "https://buy.stripe.com/dRm4gzdT70Pf0c20CTabK01"
+      monthly: "https://buy.stripe.com/7sYaEX9BneeKaqB2iCeUU00",
+      oneTime: "https://buy.stripe.com/bJe8wP14R3A6aqB3mGeUU01"
     }
   },
 

@@ -878,7 +878,7 @@
 
     const pay = [
       { key: "monthly", title: "Monthly maintenance", text: `$${(D.membership.monthlyPerPerson * (1 + (D.membership.adminPct || 0) / 100)).toFixed(2)} per person per month — $${D.membership.monthlyPerPerson} toward the upkeep the City does not cover, plus ${D.membership.adminPct}% for administration and processing.`, cta: "Set up a monthly contribution", icon: "hands" },
-      { key: "oneTime", title: "One-time toward a project", text: "Choose your own amount and pick the project it goes to — restrooms, irrigation, signage, or wherever it is needed most. That choice travels with the contribution.", cta: "Make a one-time contribution", icon: "target" }
+      { key: "oneTime", title: "One-time toward a project", text: "$25 a share — set the quantity on Stripe's page for a larger amount. The project and group you pick above travel with the contribution as its memo.", cta: "Make a one-time contribution", icon: "target" }
     ];
     $("#payGrid").innerHTML = pay.map((o) => {
       const url = safeUrl((D.membership.stripe || {})[o.key]);
