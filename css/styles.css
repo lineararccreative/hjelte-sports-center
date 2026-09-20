@@ -1030,7 +1030,10 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
   background: var(--ink); color: #fff; font-size: .8rem; letter-spacing: 0; }
 .member-step h3 { font-size: clamp(1.5rem, 3vw, 2rem); margin-bottom: 8px; }
 .step-lead { color: var(--ink-3); margin-bottom: 18px; max-width: 62ch; }
-.member-form .form-grid { gap: 16px; }
+.member-form .form-grid { gap: 14px; }
+/* .form-grid label is display:flex, which beats the hidden attribute */
+.member-form .form-grid label[hidden] { display: none; }
+.member-form .human-check input { max-width: 140px; }
 
 .check-grid { border: 0; padding: 0; margin: 0; min-width: 0; }
 .check-grid legend { font-size: .78rem; font-weight: 600; color: var(--ink-3); margin-bottom: 10px; padding: 0; }

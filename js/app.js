@@ -865,9 +865,8 @@
     $("#memberBenefits").innerHTML = M.benefits.map((b) => `<li>${esc(b)}</li>`).join("");
     $("#memberType").innerHTML = `<option value="">${I18.t("Select…")}</option>` +
       M.memberTypes.map((t) => `<option>${esc(t)}</option>`).join("");
-    $("#memberInterests").innerHTML = M.interests.map((i, n) => `<label class="check-item">
-      <input type="checkbox" name="interests" value="${esc(i.id)}"${n === 0 ? " checked" : ""}>
-      <span><b>${esc(i.label)}</b><small>${esc(i.note)}</small></span></label>`).join("");
+    $("#memberInterests").innerHTML = `<option value="">${I18.t("Select…")}</option>` +
+      M.interests.map((i) => `<option value="${esc(i.id)}">${esc(i.label)}</option>`).join("");
     // a group name only makes sense for the group and organization types
     const typeSel = $("#memberType"), wrap = $("#memberGroupWrap"), sizeWrap = $("#memberSizeWrap");
     typeSel.addEventListener("change", () => {
@@ -932,9 +931,6 @@
       $$(".field-error", form).forEach((n) => n.remove());
       const cf = form.querySelector('[name="captcha"]');
       cf.setCustomValidity(Number(String(cf.value).trim()) === mCaptcha.a + mCaptcha.b ? "" : I18.t("That answer is not right — please try the sum again."));
-      const picked = $$('input[name="interests"]:checked', form).length;
-      const box = $$('input[name="interests"]', form)[0];
-      box.setCustomValidity(picked ? "" : I18.t("Pick at least one way you'd like to help."));
       $$("input, select, textarea", form).forEach((i) => { i.classList.add("touched"); i.setAttribute("aria-invalid", String(!i.checkValidity())); });
       if (!form.checkValidity()) {
         const bad = $$(":invalid", form).filter((f) => f.name);
@@ -954,7 +950,7 @@
         name: fd.get("name"), email: fd.get("email"), phone: fd.get("phone"),
         memberType: fd.get("memberType"), groupName: fd.get("groupName") || "",
         orgSize: Number(fd.get("orgSize")) || 1,
-        interests: fd.getAll("interests"), notes: fd.get("notes") || "",
+        interests: [fd.get("interests")].filter(Boolean), notes: "",
         website2: fd.get("website2") || "", formTs: fd.get("formTs")
       };
       const done = () => {
