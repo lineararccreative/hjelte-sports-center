@@ -1126,3 +1126,13 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
   border-radius: 12px; }
 .pay-picker select:focus-visible { outline: 3px solid var(--gold-dark); outline-offset: 2px; }
 .pay-memo { margin: 0 0 18px; font-size: .86rem; color: var(--muted); line-height: 1.5; }
+
+/* Compass: north is the top of the map, and the soccer/football areas are
+   labelled N/E/S/W to match. Sits on the perimeter, clear of the diamonds. */
+.map-compass .cpt circle { fill: rgba(28,31,34,.72); stroke: rgba(241,238,230,.45); stroke-width: 1.5; }
+.map-compass .cpt text { font-family: var(--body); font-size: 16px; font-weight: 700; fill: #F1EEE6;
+  text-anchor: middle; dominant-baseline: central; letter-spacing: .5px; }
+@media (max-width: 1023.98px) {
+  .map-compass .cpt circle { r: 26px; }
+  .map-compass .cpt text { font-size: 26px; }
+}

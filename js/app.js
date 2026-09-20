@@ -263,7 +263,6 @@
   /* ---------------- schedule engine ---------------- */
   const today = new Date();
   const todayISO = isoDate(today);
-  $("#todayStamp").textContent = fmtDate(today, { weekday: "long", month: "short", day: "numeric", year: "numeric" });
 
   function occurrencesOn(date) {
     const dow = date.getDay(), iso = isoDate(date);
@@ -292,47 +291,6 @@
         ${e.note ? `<p class="activity-note">${esc(e.note)}</p>` : ""}
       </div></article>`;
   }
-
-  // Today / This Week / Upcoming
-  function renderHappening(range) {
-    const out = $("#activityList");
-    if (range === "today") {
-      const items = occurrencesOn(today);
-      out.innerHTML = items.length ? items.map((e) => activityCard(e, { today: true })).join("") : `<p class="empty-note">Nothing scheduled today. Open recreation may still be available; check posted signage.</p>`;
-    } else if (range === "week") {
-      let html = "";
-      for (let i = 0; i < 7; i++) {
-        const d = new Date(today); d.setDate(today.getDate() + i);
-        const items = occurrencesOn(d);
-        if (!items.length) continue;
-        html += `<h3 class="day-heading">${i === 0 ? "Today" : i === 1 ? "Tomorrow" : DAYS[d.getDay()]} · ${fmtDate(d, { month: "short", day: "numeric" })}</h3>` + items.map((e) => activityCard(e, { today: i === 0 })).join("");
-      }
-      out.innerHTML = html || `<p class="empty-note">No activities this week.</p>`;
-    } else {
-      const upcoming = D.specialEvents.filter((e) => e.date >= todayISO).sort((a, b) => a.date.localeCompare(b.date) || toMin(a.start) - toMin(b.start));
-      out.innerHTML = upcoming.length ? upcoming.map((e) => `<h3 class="day-heading">${fmtDate(parseISO(e.date))}</h3>` + activityCard({ ...e, special: true })).join("") : `<p class="empty-note">No special events posted yet. <a href="#connect" data-topic="Schedule update">Tell us about one →</a></p>`;
-    }
-  }
-  let currentRange = "today";
-  const TABS = $$(".tabs .tab");
-  function selectTab(t) {
-    TABS.forEach((x) => {
-      const on = x === t;
-      x.classList.toggle("is-active", on); x.setAttribute("aria-selected", String(on)); x.tabIndex = on ? 0 : -1;
-    });
-    $("#activityList").setAttribute("aria-labelledby", t.id);
-    currentRange = t.dataset.range; renderHappening(currentRange);
-  }
-  TABS.forEach((t, i) => {
-    t.addEventListener("click", () => selectTab(t));
-    t.addEventListener("keydown", (e) => {
-      const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : e.key === "Home" ? -i : e.key === "End" ? TABS.length - 1 - i : 0;
-      if (!d) return;
-      e.preventDefault();
-      const next = TABS[(i + d + TABS.length) % TABS.length];
-      next.focus(); selectTab(next);
-    });
-  });
 
   // Weekly master schedule
   const sched = { sport: "", day: "", facility: "", type: "", group: "", category: "" };
@@ -496,21 +454,11 @@
     const label = D.config.permitLabels[st] || st;
     return `<span class="badge permit permit-${permitClass(st)}">${esc(label)}</span>` + (st === "permitted" && g.paidPermit ? `<span class="badge permit permit-paid">Paid permit</span>` : "");
   }
-  function renderRoster() {
-    const order = { permitted: 0, unknown: 1, none: 2 };
-    const list = [...D.groups].sort((a, b) => (order[a.permitStatus] ?? 1) - (order[b.permitStatus] ?? 1) || a.name.localeCompare(b.name));
-    $("#rosterTable").innerHTML = `<caption class="sr-only">Every group that participates at Hjelte Sports Center, with sport, program, permit status and typical days</caption><thead><tr><th scope="col">Group</th><th scope="col">Sport</th><th scope="col">Program</th><th scope="col">Permit status</th><th scope="col">Fee</th><th scope="col">Days</th><th scope="col">Contact</th></tr></thead><tbody>` +
-      list.map((g) => { const s = sport(g.sport); const st = g.permitStatus || "unknown"; return `<tr class="${g.example ? "is-sample" : ""}">
-        <th scope="row"><b>${esc(g.name)}</b>${g.example ? ' <span class="tag tag-example">Sample</span>' : ""}</th>
-        <td><span class="dot" style="background:${s.color}"></span> ${esc(s.name)}</td>
-        <td>${esc(g.programType)}</td>
-        <td><span class="badge permit permit-${permitClass(st)}">${esc(D.config.permitLabels[st] || st)}</span></td>
-        <td>${st === "permitted" ? (g.paidPermit ? "Paid" : "Unpaid") : "—"}</td>
-        <td>${g.days.map((d) => DAYS_S[d]).join(" · ")}</td>
-        <td>${safeMail(g.email) ? `<a href="mailto:${esc(safeMail(g.email))}" aria-label="Email ${esc(g.name)}">${icon("mail")}</a>` : ""}${safeUrl(g.website) ? ` <a href="${esc(safeUrl(g.website))}" target="_blank" rel="noopener" aria-label="${esc(g.name)} website">${icon("globe")}</a>` : ""}</td></tr>`; }).join("") + `</tbody>`;
-  }
   function renderGroups() {
-    const matches = D.groups.filter(groupMatches);
+    // Both directories read alphabetically, so a visitor can find a name
+    // without scanning, and no group looks ranked above another.
+    const byName = (a, b) => String(a.name || "").localeCompare(String(b.name || ""), undefined, { sensitivity: "base" });
+    const matches = D.groups.filter(groupMatches).sort(byName);
     const perm = matches.filter((g) => g.category === "permitted"), comm = matches.filter((g) => g.category === "community");
     $("#permittedGrid").innerHTML = perm.map(groupCard).join("") || `<p class="empty-note" style="grid-column:1/-1">No permitted organizations match.</p>`;
     $("#communityGrid").innerHTML = comm.map(groupCard).join("") || `<p class="empty-note" style="grid-column:1/-1">No community groups match.</p>`;
@@ -1123,8 +1071,8 @@
   function renderAll() {
     DAYS = I18.days; DAYS_S = I18.daysShort;
     fillGroupFilter();
-    renderSports(); renderHappening(currentRange); renderSchedule(); renderLegend(); renderLastUpdated();
-    renderGroups(); renderRoster(); renderFeatured(); renderAreas(); renderProjects(); renderContribute(); renderConnect();
+    renderSports(); renderSchedule(); renderLegend(); renderLastUpdated();
+    renderGroups(); renderFeatured(); renderAreas(); renderProjects(); renderContribute(); renderConnect();
     renderUpdates(); renderSubscribeSports(); renderStewardship(); renderMembership();
     $$("[data-count]").forEach((el) => { if (el.closest(".in")) countUp(el); });
   }

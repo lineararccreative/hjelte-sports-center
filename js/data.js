@@ -136,6 +136,15 @@ window.HJELTE = {
      ------------------------------------------------------------------ */
   groups: [
     {
+      id: "footballeros", name: "Footballeros", short: "Footballeros", sport: "soccer",
+      category: "community", permitStatus: "none", paidPermit: false, badges: ["COMMUNITY GROUP"],
+      programType: "Adult pickup soccer", ages: "Adult", level: "Recreational",
+      days: [5, 6], times: "Fri–Sat 6:00 – 7:00 PM",
+      website: "", social: "", socialHandle: "", email: "",
+      description: "A neighbourhood pickup crew — footballeros is Spanish for footballers — who meet on the west soccer/football area on Friday and Saturday evenings. New players are welcome to join a side.",
+      facilities: ["soccerW"]
+    },
+    {
       id: "lac", name: "Los Angeles Cricket", short: "LAC", sport: "cricket",
       category: "permitted", permitStatus: "permitted", paidPermit: true, badges: ["PERMITTED ORGANIZATION", "NONPROFIT", "YOUTH REC", "PRO"],
       programType: "Youth recreational cricket & Minor League Cricket", ages: "Mixed", level: "Youth recreational to Minor League",
@@ -231,6 +240,8 @@ window.HJELTE = {
      day: 0–6 · type: see activityTypes · category: permitted | community | open | maintenance
      ------------------------------------------------------------------ */
   schedule: [
+    { day: 5, start: "18:00", end: "19:00", sport: "soccer",   groupId: "footballeros",        facility: "soccerW", type: "Open Recreation",   category: "community" },
+    { day: 6, start: "18:00", end: "19:00", sport: "soccer",   groupId: "footballeros",        facility: "soccerW", type: "Open Recreation",   category: "community" },
     // Sunday
     { day: 0, start: "10:00", end: "15:00", sport: "baseball", groupId: "ex-baseball-club",    facility: "sbB",     type: "Game",              category: "permitted" },
     { day: 0, start: "10:00", end: "12:30", sport: "disc",     groupId: "ex-ultimate",         facility: "outfield",   type: "Open Recreation",   category: "community" },
@@ -316,13 +327,13 @@ window.HJELTE = {
     { id: "sbD", name: "Softball Diamond 4", short: "Diamond 4", emoji: "⚾", kind: "Softball Diamond", sport: "softball", shape: "circle", x: 83.2, y: 83.7, r: 7.8, facility: "sbD",
       fieldInfo: "Lower-right diamond. Skinned infield, backstop cage, bleachers and lights. 536 ft span across to Diamond 3.", uses: "Leagues, youth baseball, kickball, open play when available.", accessibility: "Reached along the outside road." },
 
-    { id: "soccerN", name: "Soccer / Football — North", short: "", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 50.4, y: 11.3, w: 18.8, h: 17.9, facility: "soccerN",
+    { id: "soccerN", name: "Soccer / Football — North", short: "N", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 50.4, y: 11.3, w: 18.8, h: 17.9, facility: "soccerN",
       fieldInfo: "180 × 120 ft small-sided area (60 × 40 yd) laid out across the open space between Diamonds 1 and 2.", uses: "Small-sided soccer and football, youth training, warm-ups. Portable goals only — no permanent posts.", accessibility: "Level grass; nearest to the north end of the field." },
-    { id: "soccerS", name: "Soccer / Football — South", short: "", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 50.4, y: 71.7, w: 18.8, h: 17.9, facility: "soccerS",
+    { id: "soccerS", name: "Soccer / Football — South", short: "S", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 50.4, y: 71.7, w: 18.8, h: 17.9, facility: "soccerS",
       fieldInfo: "180 × 120 ft small-sided area (60 × 40 yd) in the open space between Diamonds 3 and 4.", uses: "Small-sided soccer and football, youth training, pickup games. Portable goals only.", accessibility: "Level grass; close to the south end of the outside road." },
-    { id: "soccerW", name: "Soccer / Football — West", short: "", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 32.4, y: 37.1, w: 12.5, h: 26.8, facility: "soccerW",
+    { id: "soccerW", name: "Soccer / Football — West", short: "W", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 32.4, y: 37.1, w: 12.5, h: 26.8, facility: "soccerW",
       fieldInfo: "180 × 120 ft small-sided area running north–south alongside the cricket ground, on the parking-lot side.", uses: "Small-sided soccer and football, training grids, pickup games. Portable goals only.", accessibility: "Closest marked area to the parking lot and restrooms." },
-    { id: "soccerE", name: "Soccer / Football — East", short: "", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 74.6, y: 37.1, w: 12.5, h: 26.8, facility: "soccerE",
+    { id: "soccerE", name: "Soccer / Football — East", short: "E", emoji: "⚽", kind: "Soccer / Football Area", sport: "soccer", shape: "rect", x: 74.6, y: 37.1, w: 12.5, h: 26.8, facility: "soccerE",
       fieldInfo: "180 × 120 ft small-sided area running north–south on the far side of the cricket ground.", uses: "Small-sided soccer and football, training grids, pickup games. Portable goals only.", accessibility: "Reached along the outside road on the east side." },
 
     { id: "parking", name: "Parking (west lot)", short: "Parking", kind: "Parking", sport: null, shape: "rect", x: 6, y: 12, w: 16, h: 76,

@@ -1105,6 +1105,32 @@ function applyProjects() {
    Replaces the Projects tab with the shorter list and updates the
    Los Angeles Cricket group row (youth rec + pro tiers). Safe to re-run.
    --------------------------------------------------------------------- */
+/* Footballeros — adult pickup soccer on the west soccer/football area,
+   Friday and Saturday 6-7 pm. Re-runnable: it clears its own rows first. */
+function applyFootballeros() {
+  const GROUP = {
+    id: "footballeros", name: "Footballeros", short: "Footballeros", sport: "soccer",
+    category: "community", permitStatus: "none", paidPermit: false,
+    badges: "COMMUNITY GROUP", programType: "Adult pickup soccer", ages: "Adult",
+    level: "Recreational", participants: "", days: "5,6", times: "Fri\u2013Sat 6:00 \u2013 7:00 PM",
+    website: "", social: "", socialHandle: "", email: "",
+    description: "A neighbourhood pickup crew \u2014 footballeros is Spanish for footballers \u2014 who meet on the west soccer/football area on Friday and Saturday evenings. New players are welcome to join a side.",
+    description_es: "", logoUrl: "", status: "approved", example: false, updatedAt: new Date().toISOString()
+  };
+  const SLOTS = [
+    { day: 5, start: "18:00", end: "19:00", sport: "soccer", groupId: "footballeros", facility: "soccerW", type: "Open Recreation", category: "community", title: "" },
+    { day: 6, start: "18:00", end: "19:00", sport: "soccer", groupId: "footballeros", facility: "soccerW", type: "Open Recreation", category: "community", title: "" }
+  ];
+  ensureSheet_("Groups");
+  ensureSheet_("Schedule");
+  upsertRow("Groups", "id", GROUP);
+  rows("Schedule").forEach(function (r) {
+    if (String(r.id).indexOf("fb-") === 0) deleteRowBy("Schedule", "id", r.id);
+  });
+  SLOTS.forEach(function (e, i) { e.id = "fb-" + i; upsertRow("Schedule", "id", e); });
+  return "Footballeros added: 1 group row, " + SLOTS.length + " schedule rows.";
+}
+
 function applyContentUpdates() {
   applyProjects();
   ensureSheet_("Members");
