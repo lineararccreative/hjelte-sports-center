@@ -869,15 +869,21 @@
       <input type="checkbox" name="interests" value="${esc(i.id)}"${n === 0 ? " checked" : ""}>
       <span><b>${esc(i.label)}</b><small>${esc(i.note)}</small></span></label>`).join("");
     // a group name only makes sense for the group and organization types
-    const typeSel = $("#memberType"), wrap = $("#memberGroupWrap");
+    const typeSel = $("#memberType"), wrap = $("#memberGroupWrap"), sizeWrap = $("#memberSizeWrap");
     typeSel.addEventListener("change", () => {
-      const needsName = typeSel.value && typeSel.value !== "Individual";
-      wrap.hidden = !needsName;
-      wrap.querySelector("input").required = !!needsName;
+      const isGroup = typeSel.value && typeSel.value !== "Individual";
+      wrap.hidden = !isGroup;
+      wrap.querySelector("input").required = !!isGroup;
+      sizeWrap.hidden = !isGroup;
+      sizeWrap.querySelector("input").required = !!isGroup;
+      if (!isGroup) sizeWrap.querySelector("input").value = "";
+      updateRate();
     });
+    $("#memberSizeWrap input").addEventListener("input", updateRate);
+    updateRate();
 
     const pay = [
-      { key: "monthly", title: "Monthly maintenance", text: "A recurring contribution toward the upkeep the City does not cover — mowing help, materials, small repairs.", cta: "Set up a monthly contribution", icon: "hands" },
+      { key: "monthly", title: "Monthly maintenance", text: `$${D.membership.monthlyPerPerson} per person per month from your group, toward the upkeep the City does not cover — mowing help, materials, small repairs.`, cta: "Set up a monthly contribution", icon: "hands" },
       { key: "oneTime", title: "One-time toward a project", text: "Put something toward a specific project from the list — restrooms, irrigation, signage.", cta: "Make a one-time contribution", icon: "target" }
     ];
     $("#payGrid").innerHTML = pay.map((o) => {
@@ -891,6 +897,17 @@
           : `<p class="pay-pending">${I18.t("Opening soon — join the list above and we'll email you the moment contributions open.")}</p>`}
       </article>`;
     }).join("");
+  }
+
+  /* $10 a head, shown as it is entered so nobody is surprised at checkout */
+  function updateRate() {
+    const note = $("#rateNote"); if (!note) return;
+    const rate = Number((D.membership || {}).monthlyPerPerson || 0);
+    const input = $("#memberSizeWrap input");
+    const n = input && !$("#memberSizeWrap").hidden ? Math.max(0, Math.round(Number(input.value) || 0)) : 0;
+    note.innerHTML = n
+      ? `<p><b>${n} ${n === 1 ? I18.t("person") : I18.t("people")} × $${rate} = $${n * rate} ${I18.t("per month")}</b> ${I18.t("for your group. An admin can change your headcount at any time and the amount follows it.")}</p>`
+      : `<p>${I18.t("Monthly maintenance is")} <b>$${rate} ${I18.t("per person, per month")}</b> — ${I18.t("a group of 18 contributes")} $${18 * rate} ${I18.t("a month. Individuals contribute as one person.")}</p>`;
   }
 
   /* the member form: same spam controls as the group form */
@@ -933,12 +950,13 @@
       const data = {
         name: fd.get("name"), email: fd.get("email"), phone: fd.get("phone"),
         memberType: fd.get("memberType"), groupName: fd.get("groupName") || "",
+        orgSize: Number(fd.get("orgSize")) || 1,
         interests: fd.getAll("interests"), notes: fd.get("notes") || "",
         website2: fd.get("website2") || "", formTs: fd.get("formTs")
       };
       const done = () => {
         statusEl.textContent = I18.t("You're on the community list. Check your email for a confirmation.");
-        form.reset(); $("#memberGroupWrap").hidden = true; newMemberCaptcha();
+        form.reset(); $("#memberGroupWrap").hidden = true; $("#memberSizeWrap").hidden = true; newMemberCaptcha(); updateRate();
         renderMembership();
       };
       if (String(data.website2).trim() || Date.now() - Number(data.formTs || 0) < 3000) { done(); return; }
@@ -951,7 +969,7 @@
       }
       window.location.href = mailto(`Hjelte community sign-up: ${data.name}`,
         [`Name: ${data.name}`, `Email: ${data.email}`, `Phone: ${data.phone}`,
-         `Joining as: ${data.memberType}`, `Group: ${data.groupName || "—"}`,
+         `Joining as: ${data.memberType}`, `Group: ${data.groupName || "—"}`, `People in group: ${data.orgSize}`,
          `Would like to help with: ${data.interests.join(", ") || "—"}`, "", data.notes || ""].join("\n"));
       statusEl.textContent = I18.t("Opening your email app with the details pre-filled. Send it to complete your sign-up.");
     });

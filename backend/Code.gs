@@ -28,7 +28,7 @@ const TOKEN_TTL_DAYS = 30;
 const MAX_CODE_ATTEMPTS = 5;
 
 const SCHEMA = {
-  Groups: ["id", "name", "short", "sport", "category", "permitStatus", "paidPermit", "badges", "programType", "ages", "level", "days", "times", "website", "social", "socialHandle", "email", "description", "description_es", "logoUrl", "status", "example", "updatedAt"],
+  Groups: ["id", "name", "short", "sport", "category", "permitStatus", "paidPermit", "badges", "programType", "ages", "level", "participants", "days", "times", "website", "social", "socialHandle", "email", "description", "description_es", "logoUrl", "status", "example", "updatedAt"],
   Schedule: ["id", "groupId", "day", "start", "end", "sport", "facility", "type", "category", "title", "notes", "updatedBy", "updatedAt"],
   Events: ["id", "date", "start", "end", "title", "sport", "groupId", "facility", "type", "category", "note", "updatedBy", "updatedAt"],
   Updates: ["id", "createdAt", "author", "sport", "groupId", "title", "body", "title_es", "body_es", "sentAt"],
@@ -37,13 +37,13 @@ const SCHEMA = {
   WorkLog: ["id", "date", "organization", "groupId", "activity", "area", "hours", "volunteers", "materials", "value", "verified", "addedBy", "createdAt"],
   Admins: ["email", "role", "groupIds", "name", "addedBy", "addedAt"],
   Submissions: ["id", "createdAt", "groupName", "sport", "orgType", "contact", "email", "phone", "website", "social", "days", "times", "participants", "ages", "description", "permit", "status"],
-  Members: ["id", "createdAt", "name", "email", "phone", "memberType", "groupName", "interests", "notes", "status", "updatedAt"],
+  Members: ["id", "createdAt", "name", "email", "phone", "memberType", "groupName", "orgSize", "interests", "notes", "status", "updatedAt"],
   Auth: ["email", "code", "codeExpires", "attempts", "token", "tokenExpires"],
   Meta: ["key", "value"]
 };
 const LIST_FIELDS = { badges: 1, days: 1, partners: 1, sports: 1, groupIds: 1, interests: 1 };
 const BOOL_FIELDS = { paidPermit: 1, example: 1, confirmed: 1, verified: 1 };
-const NUM_FIELDS = { day: 1, goal: 1, raised: 1, hours: 1, volunteers: 1, attempts: 1, participants: 1 };
+const NUM_FIELDS = { day: 1, goal: 1, raised: 1, hours: 1, volunteers: 1, attempts: 1, participants: 1, orgSize: 1 };
 // Sheets silently converts "09:00" into a time value and "2026-09-19" into a
 // date, so these columns are read back through explicit formatters and are
 // stored as plain text.
@@ -277,6 +277,7 @@ function joinCommunity(d) {
     name: name, email: email, phone: phone,
     memberType: type,
     groupName: oneLine(d.groupName, 120),
+    orgSize: Math.max(1, Math.min(2000, Math.round(Number(d.orgSize) || 1))),
     interests: interests,
     notes: oneLine(d.notes, 400),
     status: existing ? existing.status : "active",
@@ -443,6 +444,8 @@ function sanitizeGroup(d) {
   if (o.email !== undefined) o.email = validEmail(o.email) ? String(o.email).trim() : "";
   ["name", "short", "programType", "times", "socialHandle"].forEach((k) => { if (o[k] !== undefined) o[k] = oneLine(o[k], 160); });
   ["description", "description_es"].forEach((k) => { if (o[k] !== undefined) o[k] = String(o[k]).slice(0, 1200); });
+  // headcount drives the monthly maintenance amount, so keep it sane
+  if (o.participants !== undefined) o.participants = Math.max(0, Math.min(2000, Math.round(Number(o.participants) || 0)));
   return o;
 }
 function saveGroup(admin, d) {

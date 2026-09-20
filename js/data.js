@@ -431,7 +431,7 @@ window.HJELTE = {
   membership: {
     memberTypes: ["Individual", "Community group", "Permitted organization", "Business"],
     interests: [
-      { id: "Monthly maintenance", label: "Monthly maintenance", note: "A recurring contribution toward the upkeep the City does not cover." },
+      { id: "Monthly maintenance", label: "Monthly maintenance", note: "$10 per person per month from your group, toward the upkeep the City does not cover." },
       { id: "One-time project support", label: "One-time project support", note: "Put something toward a specific project on the list." },
       { id: "Volunteer time", label: "Volunteer time", note: "Work days, field prep, cleanups, setting up for events." },
       { id: "Materials or equipment", label: "Materials or equipment", note: "Paint, nets, tools, water, shade, anything the list needs." }
@@ -442,6 +442,9 @@ window.HJELTE = {
       "Get field notices — closures, work days, schedule changes",
       "Have a say in which project the community takes on next"
     ],
+    /* Monthly maintenance is priced per person: the group's headcount, taken
+       at intake and editable by an admin, times this rate. */
+    monthlyPerPerson: 10,
     stripe: { monthly: "", oneTime: "" }
   },
 
