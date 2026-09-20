@@ -391,7 +391,9 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .add-group .lead { color: rgba(255,255,255,.8); }
 .add-group .fine-print { color: rgba(255,255,255,.6); }
 .check-list { display: grid; gap: 10px; margin: 24px 0 28px; }
-.check-list li { display: flex; gap: 12px; align-items: center; color: rgba(255,255,255,.9); }
+.check-list li { display: flex; gap: 12px; align-items: center; color: var(--ink-3); }
+/* the list started life on the dark Add Your Group panel; keep white only there */
+.add-group .check-list li { color: rgba(255,255,255,.9); }
 .check-list li::before { content: ""; width: 22px; height: 22px; border-radius: 50%; flex: none; background: var(--grass) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12l5 5L20 7'/%3E%3C/svg%3E") center/12px no-repeat; }
 .card { background: #fff; color: var(--ink); border-radius: 20px; box-shadow: var(--shadow-lg); }
 .form-card { padding: 24px; }

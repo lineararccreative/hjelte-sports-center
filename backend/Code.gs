@@ -22,7 +22,7 @@
 
 const MASTER_EMAIL = "teamla@losangelescricket.org";
 const SITE_NAME = "Hjelte Sports Center Community Hub";
-const SITE_URL = "https://lineararccreative.github.io/hjelte-sports-center/";
+const SITE_URL = "https://hjeltesportscenter.com/";
 const CODE_TTL_MIN = 10;
 const TOKEN_TTL_DAYS = 30;
 const MAX_CODE_ATTEMPTS = 5;
