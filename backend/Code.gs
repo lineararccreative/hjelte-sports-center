@@ -253,8 +253,10 @@ const MEMBER_INTERESTS = ["Monthly maintenance", "One-time project support", "Vo
 function joinCommunity(d) {
   // a bot filled the hidden field, or came back faster than a person can type
   if (String(d.website2 || "").trim()) return { ok: true };
-  const elapsed = Date.now() - Number(d.formTs || 0);
-  if (d.formTs && elapsed < 3000) return { ok: true };
+  // a missing timestamp is treated as "too fast" — otherwise the guard is
+  // skipped simply by leaving the field out of a scripted POST
+  const started = Number(d.formTs || 0);
+  if (!started || Date.now() - started < 3000) return { ok: true };
 
   throttleGlobal("join", 60);
   const email = String(d.email || "").trim().toLowerCase();
@@ -330,7 +332,7 @@ function doPost(e) {
       case "deleteEvent": return json(withLock(() => deleteScheduleLike("Events", admin, d.id)));
       case "postUpdate": return json(withLock(() => postUpdate(admin, d)));
       case "deleteUpdate": return json(withLock(() => deleteUpdate(admin, d.id)));
-      case "saveProject": return json(withLock(() => { requireMaster(admin); const p = Object.assign({ id: uid() }, d, { updatedAt: nowISO() }); upsertRow("Projects", "id", p); touch(); return { ok: true, project: p }; }));
+      case "saveProject": return json(withLock(() => { requireMaster(admin); const prev = d.id ? rows("Projects").find((x) => x.id === d.id) : null; const p = Object.assign({}, d, { id: (prev && prev.id) || uid(), updatedAt: nowISO() }); upsertRow("Projects", "id", p); touch(); return { ok: true, project: p }; }));
       case "deleteProject": return json(withLock(() => { requireMaster(admin); deleteRowBy("Projects", "id", d.id); touch(); return { ok: true }; }));
       case "addWorkLog": return json(withLock(() => addWorkLog(admin, d)));
       case "deleteWorkLog": return json(withLock(() => deleteWorkLog(admin, d.id)));
@@ -352,23 +354,27 @@ function doPost(e) {
 /* ------------------------------------------------------------------ auth */
 function requestCode(email) {
   email = String(email || "").trim().toLowerCase();
-  const admin = rows("Admins").find((a) => String(a.email).toLowerCase() === email);
-  // Always answer the same way so the endpoint doesn't reveal who is an admin.
-  if (!admin) return { ok: true, message: "If that address is an admin, a sign-in code is on its way." };
-  // One code per address per 2 minutes, 6 per hour, and a global hourly cap.
-  throttle("code:" + email, 1, 120);
-  throttle("codeh:" + email, 6, 3600);
+  const SAME = { ok: true, message: "If that address is an admin, a sign-in code is on its way." };
+  // Throttle before looking the address up, so an admin address and a stranger's
+  // behave identically — otherwise a second rapid call reveals which is which.
+  try {
+    throttle("code:" + email, 1, 120);
+    throttle("codeh:" + email, 6, 3600);
+  } catch (err) { return SAME; }
   throttleGlobal("requestCode", 60);
+  const admin = rows("Admins").find((a) => String(a.email).toLowerCase() === email);
+  if (!admin) return SAME;
   // Utilities.getUuid() is a random v4 UUID; mixing its digits with Math.random
   // gives a better-distributed code than Math.random alone.
   const entropy = Utilities.getUuid().replace(/\D/g, "") + String(Math.floor(Math.random() * 1e6));
   const code = String(100000 + (Number(entropy.slice(0, 12)) % 900000));
   const expires = new Date(Date.now() + CODE_TTL_MIN * 60000).toISOString();
   const existing = rows("Auth").find((a) => a.email === email) || { email };
-  // attempts deliberately NOT reset here: requesting a fresh code must not
-  // clear the brute-force lockout for the window.
-  const attempts = Number(existing.attempts || 0);
-  upsertRow("Auth", "email", Object.assign(existing, { code, codeExpires: expires, attempts: attempts >= MAX_CODE_ATTEMPTS ? attempts : 0 }));
+  // A fresh code resets the attempt counter. Keeping it would lock an admin
+  // out permanently, since verifyCode refuses before it ever compares the
+  // code — and the address is public, so anyone could trigger that. Brute
+  // force is bounded by the request throttle above instead.
+  upsertRow("Auth", "email", Object.assign(existing, { code, codeExpires: expires, attempts: 0 }));
   MailApp.sendEmail({
     to: email,
     subject: `${code} is your ${SITE_NAME} sign-in code`,
@@ -469,7 +475,7 @@ function saveScheduleLike(sheetName, admin, d) {
   requireGroup(admin, d.groupId);
   const g = d.groupId ? rows("Groups").find((x) => x.id === d.groupId) : null;
   const rec = Object.assign({}, existing || {}, d, {
-    id: (existing && existing.id) || d.id || uid(),
+    id: (existing && existing.id) || uid(),
     sport: d.sport || (g ? g.sport : "community"),
     category: isMaster(admin) ? (d.category || (g ? (g.permitStatus === "permitted" ? "permitted" : "community") : "maintenance")) : (g.permitStatus === "permitted" ? "permitted" : "community"),
     updatedBy: admin.email, updatedAt: nowISO()
@@ -500,7 +506,7 @@ function postUpdate(admin, d) {
   if (prev && !isMaster(admin) && !canEditGroup(admin, prev.groupId) && prev.author !== admin.email) {
     throw new Error("You can only edit your own group's updates");
   }
-  const u = { id: d.id || uid(), createdAt: prev ? prev.createdAt : nowISO(), author: d.author || admin.name || admin.email, sport, groupId, title: d.title, body: d.body || "", title_es: d.title_es || "", body_es: d.body_es || "", sentAt: prev ? prev.sentAt : "" };
+  const u = { id: (prev && prev.id) || uid(), createdAt: prev ? prev.createdAt : nowISO(), author: d.author || admin.name || admin.email, sport, groupId, title: d.title, body: d.body || "", title_es: d.title_es || "", body_es: d.body_es || "", sentAt: prev ? prev.sentAt : "" };
   upsertRow("Updates", "id", u); touch(); return { ok: true, update: u };
 }
 function deleteUpdate(admin, id) {
@@ -518,7 +524,10 @@ function addWorkLog(admin, d) {
   }
   const prevW = d.id ? rows("WorkLog").find((x) => x.id === d.id) : null;
   if (prevW && !isMaster(admin) && !canEditGroup(admin, prevW.groupId)) throw new Error("Not your entry");
-  const w = Object.assign({ verified: isMaster(admin) }, prevW || {}, d, { id: (prevW && prevW.id) || d.id || uid(), groupId, organization, addedBy: admin.email, createdAt: nowISO() });
+  const dw = Object.assign({}, d);
+  // only a master may set or clear "verified"; otherwise keep what was there
+  if (!isMaster(admin)) delete dw.verified;
+  const w = Object.assign({ verified: false }, prevW || {}, dw, { id: (prevW && prevW.id) || uid(), groupId, organization, addedBy: admin.email, createdAt: nowISO() });
   if (!w.date || !w.activity) throw new Error("Date and activity are required");
   upsertRow("WorkLog", "id", w); touch(); return { ok: true, entry: w };
 }
@@ -566,7 +575,9 @@ function submitGroup(f) {
   if (!f.groupName || !validEmail(f.email)) throw new Error("Group name and a valid email are required");
   throttle("sg:" + String(f.email).toLowerCase(), 3, 3600);
   throttleGlobal("submitGroup", 40);
-  const s = Object.assign({ id: uid(), createdAt: nowISO(), status: "pending" }, f);
+  // the id is ours, never the caller's: a client-supplied id lands in the
+  // admin panel's markup and is a stored-XSS vector
+  const s = Object.assign({}, f, { id: uid(), createdAt: nowISO(), status: "pending" });
   Object.keys(s).forEach((k) => { if (SCHEMA.Submissions.indexOf(k) === -1) delete s[k]; else if (typeof s[k] === "string") s[k] = s[k].slice(0, 1200); });
   s.website = cleanUrl(s.website); s.groupName = oneLine(s.groupName, 120);
   appendRow("Submissions", s);

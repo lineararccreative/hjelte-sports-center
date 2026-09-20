@@ -431,7 +431,7 @@ window.HJELTE = {
   membership: {
     memberTypes: ["Individual", "Community group", "Permitted organization", "Business"],
     interests: [
-      { id: "Monthly maintenance", label: "Monthly maintenance", note: "$10.50 per person per month from your group — $10 toward upkeep plus 5% for administration and processing." },
+      { id: "Monthly maintenance", label: "Monthly maintenance" },
       { id: "One-time project support", label: "One-time project support", note: "Put something toward a specific project on the list." },
       { id: "Volunteer time", label: "Volunteer time", note: "Work days, field prep, cleanups, setting up for events." },
       { id: "Materials or equipment", label: "Materials or equipment", note: "Paint, nets, tools, water, shade, anything the list needs." }

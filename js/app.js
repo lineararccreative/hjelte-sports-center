@@ -863,23 +863,14 @@
   function renderMembership() {
     const M = D.membership; if (!M || !$("#memberForm")) return;
     $("#memberBenefits").innerHTML = M.benefits.map((b) => `<li>${esc(b)}</li>`).join("");
+    const keepType = $("#memberType").value, keepInterest = $("#memberInterests").value;
     $("#memberType").innerHTML = `<option value="">${I18.t("Select…")}</option>` +
       M.memberTypes.map((t) => `<option>${esc(t)}</option>`).join("");
     $("#memberInterests").innerHTML = `<option value="">${I18.t("Select…")}</option>` +
       M.interests.map((i) => `<option value="${esc(i.id)}">${esc(i.label)}</option>`).join("");
+    $("#memberType").value = keepType; $("#memberInterests").value = keepInterest;
     // a group name only makes sense for the group and organization types
-    const typeSel = $("#memberType"), wrap = $("#memberGroupWrap"), sizeWrap = $("#memberSizeWrap");
-    typeSel.addEventListener("change", () => {
-      const isGroup = typeSel.value && typeSel.value !== "Individual";
-      wrap.hidden = !isGroup;
-      wrap.querySelector("input").required = !!isGroup;
-      sizeWrap.hidden = !isGroup;
-      sizeWrap.querySelector("input").required = !!isGroup;
-      if (!isGroup) sizeWrap.querySelector("input").value = "";
-      updateRate();
-    });
-    $("#memberSizeWrap input").addEventListener("input", updateRate);
-    updateRate();
+    syncMemberType();
 
     const pay = [
       { key: "monthly", title: "Monthly maintenance", text: `$${(D.membership.monthlyPerPerson * (1 + (D.membership.adminPct || 0) / 100)).toFixed(2)} per person per month — $${D.membership.monthlyPerPerson} toward the upkeep the City does not cover, plus ${D.membership.adminPct}% for administration and processing.`, cta: "Set up a monthly contribution", icon: "hands" },
@@ -898,6 +889,18 @@
     }).join("");
   }
 
+  function syncMemberType(clearSize) {
+    const typeSel = $("#memberType"), wrap = $("#memberGroupWrap"), sizeWrap = $("#memberSizeWrap");
+    if (!typeSel) return;
+    const isGroup = typeSel.value && typeSel.value !== "Individual";
+    wrap.hidden = !isGroup;
+    wrap.querySelector("input").required = !!isGroup;
+    sizeWrap.hidden = !isGroup;
+    sizeWrap.querySelector("input").required = !!isGroup;
+    if (!isGroup && clearSize) sizeWrap.querySelector("input").value = "";
+    updateRate();
+  }
+
   /* $10 a head, shown as it is entered so nobody is surprised at checkout */
   function updateRate() {
     const note = $("#rateNote"); if (!note) return;
@@ -906,7 +909,7 @@
     const each = rate * (1 + pct / 100);
     const usd = (v) => "$" + (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, "");
     const input = $("#memberSizeWrap input");
-    const n = input && !$("#memberSizeWrap").hidden ? Math.max(0, Math.round(Number(input.value) || 0)) : 0;
+    const n = input && !$("#memberSizeWrap").hidden ? Math.min(2000, Math.max(0, Math.round(Number(input.value) || 0))) : 0;
     note.innerHTML = n
       ? `<p><b>${n} ${n === 1 ? I18.t("person") : I18.t("people")} × ${usd(each)} = ${usd(n * each)} ${I18.t("per month")}</b> — ${usd(n * rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing. An admin can change your headcount at any time and the amount follows it.")}</p>`
       : `<p>${I18.t("Monthly maintenance is")} <b>${usd(each)} ${I18.t("per person, per month")}</b> — ${usd(rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing.")}</p>`;
@@ -926,6 +929,8 @@
     const form = $("#memberForm"), statusEl = $("#memberFormStatus");
     if (!form) return;
     newMemberCaptcha();
+    $("#memberType").addEventListener("change", () => syncMemberType(true));
+    $("#memberSizeWrap input").addEventListener("input", updateRate);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       $$(".field-error", form).forEach((n) => n.remove());
@@ -955,7 +960,7 @@
       };
       const done = () => {
         statusEl.textContent = I18.t("You're on the community list. Check your email for a confirmation.");
-        form.reset(); $("#memberGroupWrap").hidden = true; $("#memberSizeWrap").hidden = true; newMemberCaptcha(); updateRate();
+        form.reset(); newMemberCaptcha(); syncMemberType(true);
         renderMembership();
       };
       if (String(data.website2).trim() || Date.now() - Number(data.formTs || 0) < 3000) { done(); return; }
