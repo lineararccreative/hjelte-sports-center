@@ -137,12 +137,12 @@ window.HJELTE = {
   groups: [
     {
       id: "lac", name: "Los Angeles Cricket", short: "LAC", sport: "cricket",
-      category: "permitted", permitStatus: "permitted", paidPermit: true, badges: ["PERMITTED ORGANIZATION", "NONPROFIT", "YOUTH PROGRAM"],
-      programType: "Youth cricket development & community cricket", ages: "Mixed", level: "Recreational",
+      category: "permitted", permitStatus: "permitted", paidPermit: true, badges: ["PERMITTED ORGANIZATION", "NONPROFIT", "YOUTH REC", "PRO"],
+      programType: "Youth recreational cricket & Minor League Cricket", ages: "Mixed", level: "Youth recreational to Minor League",
       days: [0, 6, 3], times: "Sat–Sun 9:00 AM – 1:00 PM · Wed 5:00 – 7:30 PM",
       website: "https://losangelescricket.org", social: "https://instagram.com/LosAngelesCricket",
       socialHandle: "@LosAngelesCricket", email: "teamla@losangelescricket.org",
-      description: "Nonprofit uniting Los Angeles across cultures and neighborhoods through cricket. Developed the natural-turf cricket pitch at Hjelte and runs youth coaching and community sessions ahead of the LA28 Games."
+      description: "Nonprofit uniting Los Angeles across cultures and neighborhoods through cricket. Developed the natural-turf pitch at Hjelte and runs youth recreational coaching and community sessions ahead of the LA28 Games. Los Angeles Cricket also organizes Minor League Cricket at Hjelte for LA Lashings, and the Lashings squad runs free community clinics to introduce the game to new players of any age."
     },
     {
       id: "ex-softball-league", name: "Valley Evening Softball League", short: "VS", sport: "softball", example: true,

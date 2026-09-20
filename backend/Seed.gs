@@ -1098,3 +1098,23 @@ function applyProjects() {
   touch();
   Logger.log("Projects replaced: " + KEEP.length + " rows.");
 }
+
+
+/* ---------------------------------------------------------------------
+   One-shot: apply the current curated content to the live sheet.
+   Replaces the Projects tab with the shorter list and updates the
+   Los Angeles Cricket group row (youth rec + pro tiers). Safe to re-run.
+   --------------------------------------------------------------------- */
+function applyContentUpdates() {
+  applyProjects();
+
+  const g = rows("Groups").filter(function (r) { return r.id === "lac"; })[0];
+  if (!g) { Logger.log("No lac row in Groups — skipped the group update."); return; }
+  g.badges = ["PERMITTED ORGANIZATION", "NONPROFIT", "YOUTH REC", "PRO"];
+  g.programType = "Youth recreational cricket & Minor League Cricket";
+  g.level = "Youth recreational to Minor League";
+  g.description = "Nonprofit uniting Los Angeles across cultures and neighborhoods through cricket. Developed the natural-turf pitch at Hjelte and runs youth recreational coaching and community sessions ahead of the LA28 Games. Los Angeles Cricket also organizes Minor League Cricket at Hjelte for LA Lashings, and the Lashings squad runs free community clinics to introduce the game to new players of any age.";
+  upsertRow("Groups", "id", g);
+  touch();
+  Logger.log("Content updated: projects replaced and the Los Angeles Cricket row refreshed.");
+}

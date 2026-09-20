@@ -55,6 +55,8 @@
     if (k.includes("PERMITTED")) return "permitted";
     if (k.includes("COMMUNITY GROUP")) return "community-group";
     if (k.includes("YOUTH")) return "youth";
+    // exact token, so "YOUTH PROGRAM" is not mistaken for the pro tier
+    if (k === "PRO" || k.includes("MINOR LEAGUE")) return "pro";
     if (k.includes("LEAGUE")) return "league";
     if (k.includes("CLUB")) return "club";
     if (k.includes("NONPROFIT")) return "nonprofit";
@@ -520,6 +522,7 @@
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       $$(".field-error", form).forEach((n) => n.remove());
+      if (form.id === "groupForm") captchaOk(form);
       $$("input, select, textarea", form).forEach((i) => { i.classList.add("touched"); i.setAttribute("aria-invalid", String(!i.checkValidity())); });
       if (!form.checkValidity()) {
         const bad = $$(":invalid", form).filter((f) => f.name);
@@ -537,12 +540,20 @@
       }
       statusEl.classList.remove("is-error");
       const fd = new FormData(form);
+      if (form.id === "groupForm") {
+        const trap = String(fd.get("website2") || "").trim();
+        const elapsed = Date.now() - Number(fd.get("formTs") || 0);
+        if (trap || elapsed < 3000) {
+          statusEl.textContent = I18.t("Your listing was sent for review. It appears once a hub admin approves it.");
+          form.reset(); newCaptcha(); return;
+        }
+      }
       if (API && form.id === "groupForm") {
         try {
           statusEl.textContent = I18.t("Sending…");
           const obj = {}; fd.forEach((v, k) => { if (!(v instanceof File)) obj[k] = v; });
           await api("submitGroup", obj);
-          statusEl.textContent = I18.t("Your listing was sent for review. It appears once a hub admin approves it."); form.reset(); return;
+          statusEl.textContent = I18.t("Your listing was sent for review. It appears once a hub admin approves it."); form.reset(); newCaptcha(); return;
         } catch (err) { statusEl.textContent = err.message; statusEl.classList.add("is-error"); return; }
       }
       if (D.config.formEndpoint) {
@@ -557,10 +568,32 @@
       statusEl.textContent = "Opening your email app with the details pre-filled. Send it to complete your submission.";
     });
   }
+  /* Spam control without a third-party service: a question a person answers,
+     a field only a bot fills in, and a floor on how fast the form comes back.
+     The same two signals are checked again server-side. */
+  const captcha = { a: 0, b: 0 };
+  function newCaptcha() {
+    const q = $("#captchaQuestion"); if (!q) return;
+    captcha.a = 2 + Math.floor(Math.random() * 8);
+    captcha.b = 1 + Math.floor(Math.random() * 8);
+    q.textContent = `${captcha.a} + ${captcha.b} = ?`;
+    const ts = $("#groupFormTs"); if (ts) ts.value = String(Date.now());
+    const field = $('#groupForm [name="captcha"]'); if (field) field.value = "";
+  }
+  function captchaOk(form) {
+    if (form.id !== "groupForm") return true;
+    const field = form.querySelector('[name="captcha"]');
+    const given = Number(String(field.value).trim());
+    const ok = given === captcha.a + captcha.b;
+    field.setCustomValidity(ok ? "" : I18.t("That answer is not right — please try the sum again."));
+    return ok;
+  }
+  newCaptcha();
+
   handleForm($("#groupForm"), $("#groupFormStatus"),
     (fd) => `Hjelte directory submission: ${fd.get("groupName")}`,
     (fd) => ["GROUP LISTING REQUEST — Hjelte Sports Center Community Hub", "",
-      ...["groupName:Group Name", "sport:Sport", "orgType:Organization Type", "contact:Primary Contact", "email:Email", "phone:Phone", "website:Website", "social:Instagram / Social", "days:Typical Days", "times:Typical Times", "participants:Approx. Participants", "ages:Youth / Adult / Mixed", "description:Description", "permit:Holds facility permit"].map((p) => { const [k, l] = p.split(":"); return `${l}: ${fd.get(k) || "—"}`; }),
+      ...["groupName:Group Name", "sport:Sport", "orgType:Organization Type", "contact:Primary Contact", "email:Email", "phone:Phone", "website:Website", "social:Instagram / Social", "days:Typical Days", "times:Typical Times", "participants:Approx. Participants", "ages:Who plays", "description:Description", "permit:Holds facility permit"].map((p) => { const [k, l] = p.split(":"); return `${l}: ${fd.get(k) || "—"}`; }),
       "", "Please attach your logo and a group photo to this email.", "",
       "Note: Directory inclusion does not represent official City recognition or permit status unless specifically indicated."].join("\n"));
   handleForm($("#contactForm"), $("#contactFormStatus"),

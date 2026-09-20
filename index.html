@@ -28,7 +28,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="preload" as="image" href="assets/img/hero-aerial.jpg" fetchpriority="high">
-  <link rel="stylesheet" href="css/styles.css?v=2026-09-19g">
+  <link rel="stylesheet" href="css/styles.css?v=2026-09-19h">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -566,27 +566,32 @@
           </select></label>
         <label><span>Primary Contact *</span><input name="contact" required></label>
         <label><span>Email *</span><input name="email" type="email" required></label>
-        <label><span>Phone <em>optional</em></span><input name="phone" type="tel"></label>
+        <label><span>Phone *</span><input name="phone" type="tel" required autocomplete="tel" inputmode="tel" placeholder="e.g. 818-555-0134"></label>
         <label><span>Website</span><input name="website" type="url" placeholder="https://"></label>
         <label><span>Instagram / Social</span><input name="social" placeholder="@handle or link"></label>
         <label><span>Typical Days</span><input name="days" placeholder="e.g. Tue, Thu, Sat"></label>
         <label><span>Typical Times</span><input name="times" placeholder="e.g. 6:00 – 8:00 PM"></label>
         <label><span>Approximate Number of Participants</span><input name="participants" type="number" min="1"></label>
-        <fieldset class="span-2 radio-row"><legend>Youth / Adult / Mixed</legend>
+        <fieldset class="span-2 radio-row"><legend>Who plays with your group?</legend>
           <label><input type="radio" name="ages" value="Youth"> Youth</label>
-          <label><input type="radio" name="ages" value="Adult"> Adult</label>
           <label><input type="radio" name="ages" value="Mixed" checked> Mixed</label>
         </fieldset>
         <label class="span-2"><span>Short Description</span><textarea name="description" rows="3" maxlength="400" placeholder="Who you are, what you play, who's welcome."></textarea></label>
         <label class="file"><span>Upload Logo</span><input type="file" name="logo" accept="image/*"></label>
         <label class="file"><span>Upload Group Photo</span><input type="file" name="photo" accept="image/*"></label>
-        <fieldset class="span-2 radio-row"><legend>Does your organization currently hold a facility permit?</legend>
-          <label><input type="radio" name="permit" value="Yes"> Yes</label>
+        <fieldset class="span-2 radio-row"><legend>Does your organization currently hold a facility permit? *</legend>
+          <label><input type="radio" name="permit" value="Yes" required> Yes</label>
           <label><input type="radio" name="permit" value="No"> No</label>
-          <label><input type="radio" name="permit" value="Not sure"> Not sure</label>
-          <label><input type="radio" name="permit" value="Prefer not to say" checked> Prefer not to say</label>
         </fieldset>
+
+        <label class="span-2 human-check"><span>Quick check: <b id="captchaQuestion">…</b> *</span>
+          <input name="captcha" required inputmode="numeric" autocomplete="off" aria-describedby="captchaHelp" style="max-width:180px">
+          <small id="captchaHelp" class="field-help">Answer in digits — this keeps automated spam out of the directory.</small>
+        </label>
+        <p class="hp-field" aria-hidden="true"><label>Leave this field empty<input type="text" name="website2" tabindex="-1" autocomplete="off"></label></p>
+        <input type="hidden" name="formTs" id="groupFormTs">
       </div>
+
       <div class="form-actions">
         <button type="submit" class="btn btn-primary btn-lg">Submit Group</button>
         <p class="form-status" id="groupFormStatus" role="status"></p>
@@ -615,8 +620,20 @@
   <div class="container">
     <div class="section-head reveal">
       <h2>Who Keeps Hjelte Going</h2>
-      <p class="lead">The effort behind the fields: maintenance, cleanups, repairs and materials contributed by the groups who play here. Logged by group admins and verified by the hub.</p>
+      <p class="lead">The City of Los Angeles Department of Recreation and Parks maintains Hjelte Sports Center — the fields, the buildings and the grounds. Permitted upkeep and maintenance of the cricket pitch and its playing area is carried out by Los Angeles Cricket. Everything below is the volunteer effort logged on top of that, by the groups who play here.</p>
     </div>
+
+    <div class="care-split reveal">
+      <div class="care-card">
+        <p class="care-who">City of Los Angeles<br><b>Recreation and Parks</b></p>
+        <p>Maintains the park: mowing and irrigation, the restroom building, lighting, the diamonds and the shared outfield, waste collection and the perimeter road. Permits for organized activity are issued here too.</p>
+      </div>
+      <div class="care-card">
+        <p class="care-who">Permitted upkeep by<br><b>Los Angeles Cricket</b></p>
+        <p>Maintains the cricket pitch and its playing area under permit: mowing, rolling and crease marking, boundary set-up on match days, and keeping the prepared turf playable between sessions.</p>
+      </div>
+    </div>
+
     <ul class="stats-row reveal" id="stewardStats"></ul>
     <div class="steward-grid reveal">
       <div>
@@ -746,8 +763,8 @@
 
 <button class="to-top" id="toTop" aria-label="Back to top">↑</button>
 
-<script src="js/data.js?v=2026-09-19g"></script>
-<script src="js/i18n.js?v=2026-09-19g"></script>
-<script src="js/app.js?v=2026-09-19g"></script>
+<script src="js/data.js?v=2026-09-19h"></script>
+<script src="js/i18n.js?v=2026-09-19h"></script>
+<script src="js/app.js?v=2026-09-19h"></script>
 </body>
 </html>

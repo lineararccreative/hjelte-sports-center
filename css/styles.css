@@ -370,6 +370,7 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .badge.community-group { background: var(--grass-light); color: var(--grass-dark); border-color: transparent; }
 .badge.youth { background: #F6E9DC; color: #9A5A22; border-color: transparent; }
 .badge.league, .badge.club { background: #E8ECF1; color: #35506B; border-color: transparent; }
+.badge.pro { background: #DCEAEC; color: #17555C; border-color: transparent; }
 .badge.nonprofit { background: var(--gold-light); color: var(--gold-dark); border-color: transparent; }
 .badge.open-rec { background: #E9F1EC; color: var(--grass-dark); border-color: transparent; }
 .group-desc { font-size: .9rem; color: var(--ink-3); margin: 0; }
@@ -999,3 +1000,19 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
   .wg-event { font-size: .8rem; padding: 7px 9px; }
   .wg-event b { white-space: normal; }
 }
+
+
+/* ---------- Group form: spam controls ---------- */
+/* Off-screen rather than display:none — bots that skip hidden fields still fill it. */
+.hp-field { position: absolute; left: -9999px; width: 1px; height: 1px; overflow: hidden; }
+.human-check span b { font-family: var(--body); font-size: 1rem; letter-spacing: 0; text-transform: none; color: var(--ink); }
+.field-help { display: block; margin-top: 6px; font-size: .76rem; font-weight: 500; color: var(--muted); }
+
+
+/* ---------- Who keeps Hjelte going: the two standing responsibilities ---------- */
+.care-split { display: grid; gap: 14px; margin: 0 0 26px; }
+@media (min-width: 720px) { .care-split { grid-template-columns: 1fr 1fr; } }
+.care-card { background: var(--off); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px 22px; }
+.care-who { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 600; line-height: 1.5; margin: 0 0 10px; }
+.care-who b { display: block; font-family: var(--display); font-size: 1.25rem; letter-spacing: 0; text-transform: none; color: var(--ink); font-weight: 700; }
+.care-card p:last-child { margin: 0; font-size: .92rem; line-height: 1.6; color: var(--ink-3); }
