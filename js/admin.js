@@ -366,7 +366,7 @@
         select("Sport", "sport", D.sports.map((s) => [s.id, s.name]), g.sport) +
         field("Program type", "programType", g.programType) +
         select("Ages", "ages", ["Youth", "Mixed"], g.ages) + select("Level", "level", ["Recreational", "Competitive"], g.level) +
-        field("People in the group", "participants", g.participants, "number", "drives the $10-per-person monthly maintenance amount") +
+        field("Members in the group", "participants", g.participants, "number", "drives the $10-per-member monthly maintenance amount") +
         dayChecks + field("Typical times", "times", g.times, "text", 'e.g. "Tue · Thu 6:00 – 8:00 PM"') +
         field("Website", "website", g.website, "url") + field("Social link", "social", g.social, "url") + field("Social handle", "socialHandle", g.socialHandle) +
         field("Contact email", "email", g.email, "email") +

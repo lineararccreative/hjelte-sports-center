@@ -103,6 +103,18 @@
     "Pick at least one way you\u2019d like to help.": "Elige al menos una forma de ayudar.",
     "Opening soon — join the list above and we\u2019ll email you the moment contributions open.": "Disponible pronto: únete a la lista de arriba y te avisaremos por correo en cuanto se abran las contribuciones.",
     "People in your group *": "Personas en tu grupo *", "person": "persona", "people": "personas", "per month": "al mes",
+    /* "people" is also the volunteer count in the work log, so the membership
+       count gets its own keys rather than sharing one. */
+    "member": "miembro", "members": "miembros", "per member per month": "por miembro al mes", "per member, per month": "por miembro, al mes",
+    "This is what you will be charged every month. It stays at this amount even if the group's size changes later.": "Esto es lo que se te cobrará cada mes. Se mantiene en esta cantidad aunque el tamaño del grupo cambie después.",
+    "for administration and processing. Your monthly amount is fixed when you set it up — it does not change if the group's size changes later.": "para administración y procesamiento. Tu cantidad mensual queda fija al configurarla: no cambia si el tamaño del grupo cambia después.",
+    "Pick a group above and the monthly amount appears here.": "Elige un grupo arriba y la cantidad mensual aparecerá aquí.",
+    "That group has no headcount on file yet, so a monthly amount cannot be worked out.": "Ese grupo aún no tiene un número de miembros registrado, así que no se puede calcular una cantidad mensual.",
+    "Give once, in any amount. The project and group you pick above travel with it as the memo.": "Da una sola vez, la cantidad que quieras. El proyecto y el grupo que elijas arriba viajan con la contribución como nota.",
+    "Amount": "Cantidad", "Other": "Otra", "Other amount, in dollars": "Otra cantidad, en dólares",
+    "Setting up a secure Stripe page…": "Preparando una página segura de Stripe…", "Opening Stripe…": "Abriendo Stripe…", "Taking you to Stripe…": "Llevándote a Stripe…",
+    "Enter an amount between": "Introduce una cantidad entre", "and": "y",
+    "Could not start that contribution.": "No se pudo iniciar esa contribución.", "Something went wrong. Please try again.": "Algo salió mal. Inténtalo de nuevo.",
     "Monthly maintenance is": "El mantenimiento mensual es de", "toward upkeep plus": "para mantenimiento más", "for administration and processing.": "para administración y procesamiento.", "for administration and processing. An admin can change your headcount at any time and the amount follows it.": "para administración y procesamiento. Un administrador puede cambiar el número de personas en cualquier momento y el monto se ajusta.", "per person, per month": "por persona, al mes",
     "for your group. An admin can change your headcount at any time and the amount follows it.": "para tu grupo. Un administrador puede cambiar el número de personas en cualquier momento y el monto se ajusta.",
     "Monthly maintenance is $10 per person. An admin can update this later.": "El mantenimiento mensual es de $10 por persona. Un administrador puede actualizarlo más adelante.",

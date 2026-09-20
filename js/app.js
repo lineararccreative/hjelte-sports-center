@@ -881,7 +881,7 @@
       <article class="pay-card">
         <span class="ic">${icon("hands")}</span>
         <h4>${esc(I18.t("Monthly maintenance"))}</h4>
-        <p>${esc(usd(perHead))} ${esc(I18.t("per person per month"))} — $${esc(String(M.monthlyPerPerson))} ${esc(I18.t("toward the upkeep the City does not cover, plus"))} ${esc(String(M.adminPct))}% ${esc(I18.t("for administration and processing."))}</p>
+        <p>${esc(usd(perHead))} ${esc(I18.t("per member per month"))} — $${esc(String(M.monthlyPerPerson))} ${esc(I18.t("toward the upkeep the City does not cover, plus"))} ${esc(String(M.adminPct))}% ${esc(I18.t("for administration and processing."))}</p>
         <p class="pay-total" id="payMonthlyTotal" role="status" aria-live="polite"></p>
         <button class="btn btn-primary btn-sm" type="button" data-checkout="subscription">${esc(I18.t("Set up a monthly contribution"))}</button>
       </article>
@@ -1014,7 +1014,7 @@
       total.innerHTML = !grp
         ? esc(I18.t("Pick a group above and the monthly amount appears here."))
         : n > 0
-          ? `<b>${n} ${n === 1 ? esc(I18.t("person")) : esc(I18.t("people"))} × ${esc(usd(each))} = ${esc(usd(n * each))} ${esc(I18.t("per month"))}</b><br><span>${esc(I18.t("This is what you will be charged every month. It stays at this amount even if the group's size changes later."))}</span>`
+          ? `<b>${n} ${n === 1 ? esc(I18.t("member")) : esc(I18.t("members"))} × ${esc(usd(each))} = ${esc(usd(n * each))} ${esc(I18.t("per month"))}</b><br><span>${esc(I18.t("This is what you will be charged every month. It stays at this amount even if the group's size changes later."))}</span>`
           : esc(I18.t("That group has no headcount on file yet, so a monthly amount cannot be worked out."));
     }
     if (btn) btn.disabled = !(grp && n > 0);
@@ -1042,8 +1042,8 @@
     const input = $("#memberSizeWrap input");
     const n = input && !$("#memberSizeWrap").hidden ? Math.min(2000, Math.max(0, Math.round(Number(input.value) || 0))) : 0;
     note.innerHTML = n
-      ? `<p><b>${n} ${n === 1 ? I18.t("person") : I18.t("people")} × ${usd(each)} = ${usd(n * each)} ${I18.t("per month")}</b> — ${usd(n * rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing. Your monthly amount is fixed when you set it up — it does not change if the group's size changes later.")}</p>`
-      : `<p>${I18.t("Monthly maintenance is")} <b>${usd(each)} ${I18.t("per person, per month")}</b> — ${usd(rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing.")}</p>`;
+      ? `<p><b>${n} ${n === 1 ? I18.t("member") : I18.t("members")} × ${usd(each)} = ${usd(n * each)} ${I18.t("per month")}</b> — ${usd(n * rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing. Your monthly amount is fixed when you set it up — it does not change if the group's size changes later.")}</p>`
+      : `<p>${I18.t("Monthly maintenance is")} <b>${usd(each)} ${I18.t("per member, per month")}</b> — ${usd(rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing.")}</p>`;
   }
 
   /* the member form: same spam controls as the group form */
