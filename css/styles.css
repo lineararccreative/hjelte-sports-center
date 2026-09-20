@@ -894,7 +894,9 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
    feedback, no zoom-on-focus, sheets that behave, and rows that swipe.
    ===================================================================== */
 
-html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: calc(var(--header-h) + 12px); }
+/* scroll-padding-top and -webkit-text-size-adjust are already set on html at
+   the top of this file; repeating them here let the two copies drift. */
+html { text-size-adjust: 100%; }
 body { overscroll-behavior-y: none; }
 a, button, summary, [role="button"], label, select, input, textarea { -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 

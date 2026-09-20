@@ -107,10 +107,6 @@
 
   /* ---------------- panel rendering ---------------- */
   const myGroups = () => data.groups || [];
-  function groupOptions(sel, allowBlank) {
-    return (allowBlank && isMaster() ? `<option value="">— none / facility-wide —</option>` : "") +
-      myGroups().map((g) => `<option value="${g.id}"${sel === g.id ? " selected" : ""}>${esc(g.name)}</option>`).join("");
-  }
   function opts(list, sel) { return list.map((o) => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}"${String(sel) === String(v) ? " selected" : ""}>${esc(l)}</option>`; }).join(""); }
   function table(cols, rows, caption) {
     if (!rows.length) return `<p class="empty">Nothing here yet.</p>`;
@@ -128,7 +124,9 @@
     return `<td class="actions"><button class="btn btn-text" data-act="${editAction}" data-id="${i}" aria-label="Edit${n}">Edit</button>${dup}<button class="btn btn-text btn-danger" data-act="${delAction}" data-id="${i}" aria-label="Delete${n}">Delete</button></td>`;
   }
   function bindActions() {
-    $$("#panel [data-act]").forEach((b) => b.addEventListener("click", () => ACTIONS[b.dataset.act](b.dataset.id)));
+    // Clear the duplicate flag at the one place every action starts, so it can
+    // never survive from a previous click into an unrelated drawer.
+    $$("#panel [data-act]").forEach((b) => b.addEventListener("click", () => { drawerIsDup = false; ACTIONS[b.dataset.act](b.dataset.id); }));
   }
 
   function render() {
@@ -137,7 +135,7 @@
     const R = RENDER[tab]; T.textContent = TABS.find((t) => t.id === tab).label;
     R(P, A);
     bindActions();
-    $$("#panelActions [data-act]").forEach((b) => b.addEventListener("click", () => ACTIONS[b.dataset.act]()));
+    $$("#panelActions [data-act]").forEach((b) => b.addEventListener("click", () => { drawerIsDup = false; ACTIONS[b.dataset.act](); }));
   }
 
   const RENDER = {
@@ -229,9 +227,11 @@
     // call's arguments are being evaluated — so the flag is always set before
     // we read it here, and we clear it so the next drawer starts clean.
     const dup = drawerIsDup; drawerIsDup = false;
-    $("#drawerForm").innerHTML = (dup
-      ? '<p class="panel-note span-2">Saving creates a <b>new</b> record. The fields below are copied from the one you duplicated — the original is left as it is.</p>'
-      : "") + fields;
+    // The hint lives in the markup and is wired to the dialog with
+    // aria-describedby, so it is announced with the title rather than sitting
+    // as loose text ahead of the first field where a reader would skip it.
+    $("#drawerHint").hidden = !dup;
+    $("#drawerForm").innerHTML = fields;
     $("#drawerStatus").textContent = "";
     onSave = save; drawer.hidden = false;
     document.addEventListener("keydown", trapDrawer);
@@ -239,6 +239,7 @@
   }
   function closeDrawer() {
     drawer.hidden = true; onSave = null;
+    $("#drawerHint").hidden = true; drawerIsDup = false;
     document.removeEventListener("keydown", trapDrawer);
     if (drawerLastFocus && drawerLastFocus.isConnected) drawerLastFocus.focus();
   }

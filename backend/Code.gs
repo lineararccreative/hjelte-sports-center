@@ -342,9 +342,13 @@ function doPost(e) {
       case "deleteWorkLog": return json(withLock(() => deleteWorkLog(admin, d.id)));
       case "verifyWorkLog": return json(withLock(() => { requireMaster(admin); const w = rows("WorkLog").find((x) => x.id === d.id); if (!w) throw new Error("Not found"); w.verified = !!d.verified; upsertRow("WorkLog", "id", w); return { ok: true }; }));
       case "addAdmin": return json(withLock(() => addAdmin(admin, d)));
-      case "removeAdmin": return json(withLock(() => { requireMaster(admin); if (d.email === MASTER_EMAIL) throw new Error("Cannot remove the master admin"); deleteRowBy("Admins", "email", String(d.email).toLowerCase()); return { ok: true }; }));
+      // Compare the same normalised address the delete uses, or "TeamLA@..."
+      // slips past the guard and deletes the master's own row.
+      case "removeAdmin": return json(withLock(() => { requireMaster(admin); const em = String(d.email || "").trim().toLowerCase(); if (em === MASTER_EMAIL) throw new Error("Cannot remove the master admin"); deleteRowBy("Admins", "email", em); return { ok: true }; }));
       case "approveSubmission": return json(withLock(() => approveSubmission(admin, d)));
-      case "rejectSubmission": return json(withLock(() => { requireMaster(admin); const s = rows("Submissions").find((x) => x.id === d.id); if (s) { s.status = "rejected"; upsertRow("Submissions", "id", s); } return { ok: true }; }));
+      // Same pending-only rule as approveSubmission, so an already-approved
+      // submission cannot be flipped to rejected after its group exists.
+      case "rejectSubmission": return json(withLock(() => { requireMaster(admin); const s = rows("Submissions").find((x) => x.id === d.id); if (!s) throw new Error("Submission not found"); if (String(s.status).toLowerCase() !== "pending") throw new Error("That submission has already been " + String(s.status) + "."); s.status = "rejected"; upsertRow("Submissions", "id", s); return { ok: true }; }));
       case "subscribers": requireMaster(admin); return json({ ok: true, subscribers: rows("Subscribers").map((s) => ({ email: s.email, sports: s.sports, confirmed: s.confirmed, createdAt: s.createdAt })) });
       case "sendDigestNow": requireMaster(admin); return json(sendDailyDigest(true));
       case "setLastUpdated": requireMaster(admin); setMeta("lastUpdated", d.date || todayISO()); return json({ ok: true });
@@ -451,6 +455,10 @@ function sanitizeGroup(d) {
   const o = Object.assign({}, d);
   if (o.website !== undefined) o.website = cleanUrl(o.website);
   if (o.social !== undefined) o.social = cleanUrl(o.social);
+  // logoUrl has no field in the admin UI but is not master-only, so a
+  // hand-crafted request could set it. The directory also guards it, but the
+  // stored value should be a real URL in the first place.
+  if (o.logoUrl !== undefined) o.logoUrl = cleanUrl(o.logoUrl);
   if (o.email !== undefined) o.email = validEmail(o.email) ? String(o.email).trim() : "";
   ["name", "short", "programType", "times", "socialHandle"].forEach((k) => { if (o[k] !== undefined) o[k] = oneLine(o[k], 160); });
   ["description", "description_es"].forEach((k) => { if (o[k] !== undefined) o[k] = String(o[k]).slice(0, 1200); });
@@ -459,11 +467,13 @@ function sanitizeGroup(d) {
   return o;
 }
 function saveGroup(admin, d) {
-  const existing = rows("Groups").find((g) => g.id === d.id);
+  const all = rows("Groups");
+  const existing = all.find((g) => g.id === d.id);
   if (!existing) {
     requireMaster(admin);
     d = sanitizeGroup(d);
-    const g = Object.assign({ status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: freshGroupId(d.name), updatedAt: nowISO() });
+    // reuse the rows we already read rather than pulling the sheet twice
+    const g = Object.assign({ status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: freshGroupId(d.name, all), updatedAt: nowISO() });
     upsertRow("Groups", "id", g); touch(); return { ok: true, group: g };
   }
   requireGroup(admin, existing.id);
@@ -670,9 +680,9 @@ function slug(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "
    saved without renaming, or a public submission named after a group already
    in the directory — would otherwise have the second silently overwrite the
    first, contact email and all. Suffix until the id is free. */
-function freshGroupId(name) {
+function freshGroupId(name, known) {
   const base = slug(name) || uid();
-  const taken = rows("Groups").map((g) => String(g.id));
+  const taken = (known || rows("Groups")).map((g) => String(g.id));
   if (taken.indexOf(base) === -1) return base;
   for (var n = 2; n < 200; n++) if (taken.indexOf(base + "-" + n) === -1) return base + "-" + n;
   return base + "-" + uid();

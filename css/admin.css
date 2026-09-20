@@ -57,6 +57,9 @@ html { scroll-padding-top: calc(var(--header-h) + 78px); }
 .drawer-head .modal-close { position: static; }
 /* min-height:0 lets the scrolling form actually shrink; without it a long form
    grows past the panel and covers the Save button in the footer. */
+/* Sits between the title and the form so aria-describedby reads it out with
+   the dialog's name; `hidden` when the drawer is an edit rather than a copy. */
+.drawer-hint { margin: 0; padding: 14px 24px 0; flex: none; }
 .drawer-panel .form-grid { padding: 20px 24px; overflow: auto; flex: 1 1 auto; min-height: 0; align-content: start; }
 .drawer-panel .form-grid label { font-size: .78rem; }
 .drawer-panel .form-grid input, .drawer-panel .form-grid select, .drawer-panel .form-grid textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; font-size: .92rem; }
