@@ -835,3 +835,13 @@ function repairFormats() {
   setMeta("lastUpdated", todayISO());
   Logger.log("Formats repaired. lastUpdated = " + todayISO());
 }
+
+/* One-time: grants the "connect to an external service" permission that the
+   Stripe call needs. Google only prompts for a scope when it notices one is
+   missing, and a function that never calls out does not trigger that check.
+   Sends no key and changes nothing — a 401 back from Stripe is the expected,
+   correct result. Run it from the editor, not the web app. */
+function authorizeStripe() {
+  const res = UrlFetchApp.fetch("https://api.stripe.com/v1/checkout/sessions", { muteHttpExceptions: true });
+  Logger.log("External requests authorized — Stripe replied HTTP " + res.getResponseCode());
+}

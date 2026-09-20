@@ -1039,6 +1039,21 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
 .pay-card h4 { font-family: var(--display); font-size: 1.2rem; margin-bottom: 6px; }
 .pay-card p { font-size: .92rem; color: var(--ink-3); margin-bottom: 14px; line-height: 1.6; }
 .pay-pending { font-size: .86rem; color: var(--muted); font-style: normal; margin: 0; }
+/* The monthly figure is spelled out on the card so the first time anyone sees
+   the amount is here, not on Stripe's page. */
+.pay-total { font-size: .92rem; color: var(--ink-3); line-height: 1.55; margin: 0 0 14px;
+  padding: 12px 14px; background: var(--off); border-radius: 10px; }
+.pay-total b { color: var(--ink); font-size: 1rem; }
+.pay-total span { color: var(--muted); font-size: .84rem; }
+.amt-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 16px; border: 0; padding: 0; }
+.amt-row label { display: inline-flex; align-items: center; gap: 7px; font-size: .92rem; color: var(--ink-3); }
+.amt-other { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: .92rem; }
+.amt-other input { width: 92px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px;
+  font: inherit; font-size: .92rem; background: #fff; }
+.amt-other input:disabled { background: var(--off); color: var(--muted); }
+.pay-card .btn[disabled] { opacity: .55; cursor: not-allowed; }
+.pay-status { grid-column: 1 / -1; margin: 0; font-size: .88rem; color: var(--muted); min-height: 1.2em; }
+.pay-status.is-bad { color: #8A3B2E; font-weight: 600; }
 
 /* =====================================================================
    Facility map on a phone

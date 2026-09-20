@@ -876,21 +876,29 @@
     // a group name only makes sense for the group and organization types
     syncMemberType();
 
-    const pay = [
-      { key: "monthly", title: "Monthly maintenance", text: `$${(D.membership.monthlyPerPerson * (1 + (D.membership.adminPct || 0) / 100)).toFixed(2)} per person per month — $${D.membership.monthlyPerPerson} toward the upkeep the City does not cover, plus ${D.membership.adminPct}% for administration and processing.`, cta: "Set up a monthly contribution", icon: "hands" },
-      { key: "oneTime", title: "One-time toward a project", text: "$25 a share — set the quantity on Stripe's page for a larger amount. The project and group you pick above travel with the contribution as its memo.", cta: "Make a one-time contribution", icon: "target" }
-    ];
-    $("#payGrid").innerHTML = pay.map((o) => {
-      const url = safeUrl((D.membership.stripe || {})[o.key]);
-      return `<article class="pay-card">
-        <span class="ic">${icon(o.icon)}</span>
-        <h4>${esc(o.title)}</h4>
-        <p>${esc(o.text)}</p>
-        ${url
-          ? `<a class="btn btn-primary btn-sm" data-pay="${esc(o.key)}" href="${esc(url)}" target="_blank" rel="noopener">${esc(o.cta)}<span class="sr-only"> (opens Stripe in a new tab)</span></a>`
-          : `<p class="pay-pending">${I18.t("Opening soon — join the list above and we'll email you the moment contributions open.")}</p>`}
-      </article>`;
-    }).join("");
+    const perHead = Number(M.monthlyPerPerson || 0) * (1 + Number(M.adminPct || 0) / 100);
+    $("#payGrid").innerHTML = `
+      <article class="pay-card">
+        <span class="ic">${icon("hands")}</span>
+        <h4>${esc(I18.t("Monthly maintenance"))}</h4>
+        <p>${esc(usd(perHead))} ${esc(I18.t("per person per month"))} — $${esc(String(M.monthlyPerPerson))} ${esc(I18.t("toward the upkeep the City does not cover, plus"))} ${esc(String(M.adminPct))}% ${esc(I18.t("for administration and processing."))}</p>
+        <p class="pay-total" id="payMonthlyTotal" role="status" aria-live="polite"></p>
+        <button class="btn btn-primary btn-sm" type="button" data-checkout="subscription">${esc(I18.t("Set up a monthly contribution"))}</button>
+      </article>
+      <article class="pay-card">
+        <span class="ic">${icon("target")}</span>
+        <h4>${esc(I18.t("One-time toward a project"))}</h4>
+        <p>${esc(I18.t("Give once, in any amount. The project and group you pick above travel with it as the memo."))}</p>
+        <fieldset class="amt-row">
+          <legend class="sr-only">${esc(I18.t("Amount"))}</legend>
+          ${PAY_PRESETS.map((v, i) => `<label><input type="radio" name="payAmt" value="${v}"${i === 1 ? " checked" : ""}> ${esc(usd(v))}</label>`).join("")}
+          <label><input type="radio" name="payAmt" value="other"> ${esc(I18.t("Other"))}</label>
+          <span class="amt-other"><span aria-hidden="true">$</span><input type="number" id="payAmtOther" min="${PAY_MIN}" max="${PAY_MAX}" step="1" inputmode="decimal" aria-label="${esc(I18.t("Other amount, in dollars"))}" disabled></span>
+        </fieldset>
+        <button class="btn btn-primary btn-sm" type="button" data-checkout="payment">${esc(I18.t("Make a one-time contribution"))}</button>
+      </article>
+      <p class="pay-status" id="payStatus" role="status" aria-live="polite"></p>`;
+    bindPayGrid();
     renderPayPicker();
   }
 
@@ -907,6 +915,53 @@
      ------------------------------------------------------------------ */
   const GENERAL_PROJECT = "General maintenance — where it is needed most";
   const NO_GROUP = "Myself — not for a group";
+  const PAY_PRESETS = [25, 50, 100];
+  const PAY_MIN = 5, PAY_MAX = 5000;   // mirrors the backend's own limits
+  const usd = (v) => "$" + (Math.round(v * 100) / 100).toFixed(2).replace(/\.00$/, "");
+  let payRef = "", payBusy = false;
+
+  /* Bound once on the container, which survives every re-render of the cards. */
+  function bindPayGrid() {
+    const grid = $("#payGrid"); if (!grid || grid.dataset.bound) return;
+    grid.dataset.bound = "1";
+    grid.addEventListener("change", (e) => {
+      if (e.target.name !== "payAmt") return;
+      const other = $("#payAmtOther");
+      const isOther = e.target.value === "other";
+      other.disabled = !isOther;
+      if (isOther) other.focus(); else other.value = "";
+    });
+    grid.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-checkout]"); if (!btn || payBusy) return;
+      const mode = btn.dataset.checkout;
+      const status = $("#payStatus");
+      const say = (m, bad) => { if (status) { status.textContent = m; status.classList.toggle("is-bad", !!bad); } };
+      const data = { mode, ref: payRef, projectId: $("#payProject").value || "", groupId: $("#payGroup").value || "" };
+      if (mode === "payment") {
+        const picked = $$('#payGrid [name="payAmt"]').find((r) => r.checked);
+        const dollars = picked && picked.value === "other" ? Number($("#payAmtOther").value) : Number(picked && picked.value);
+        if (!(dollars >= PAY_MIN) || dollars > PAY_MAX) {
+          say(`${I18.t("Enter an amount between")} ${usd(PAY_MIN)} ${I18.t("and")} ${usd(PAY_MAX)}.`, true);
+          const o = $("#payAmtOther"); if (o && !o.disabled) o.focus();
+          return;
+        }
+        data.amountCents = Math.round(dollars * 100);
+      }
+      payBusy = true; btn.disabled = true;
+      const was = btn.textContent; btn.textContent = I18.t("Opening Stripe…");
+      say(I18.t("Setting up a secure Stripe page…"));
+      try {
+        const r = await api("createCheckout", data);
+        if (!r || !r.url) throw new Error(I18.t("Could not start that contribution."));
+        say(I18.t("Taking you to Stripe…"));
+        window.location.assign(r.url);
+      } catch (err) {
+        say(err.message || I18.t("Something went wrong. Please try again."), true);
+        btn.disabled = false; btn.textContent = was; payBusy = false;
+        updatePayMemo();
+      }
+    });
+  }
   // client_reference_id accepts letters, digits, "-" and "_" only, up to 200.
   const cssEsc = (v) => (window.CSS && CSS.escape ? CSS.escape(String(v)) : String(v).replace(/["\\]/g, "\\$&"));
   const refToken = (s) => String(s || "").trim().replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 90) || "Unspecified";
@@ -945,14 +1000,24 @@
     // Titles are free text an admin edits, so a stable id is appended where one
     // exists; two similarly named rows stay distinguishable in Stripe's exports.
     const part = (label, rec) => refToken(label) + (rec && rec.id ? "-" + refToken(rec.id).slice(0, 24) : "");
-    const ref = `${part(projLabel, proj)}--for--${part(grpLabel, grp)}`.slice(0, 200);
-    $$("#payGrid [data-pay]").forEach((a) => {
-      const base = safeUrl((D.membership.stripe || {})[a.dataset.pay]);
-      if (!base) return;
-      a.href = base + (base.indexOf("?") > -1 ? "&" : "?") + "client_reference_id=" + encodeURIComponent(ref);
-    });
+    payRef = `${part(projLabel, proj)}--for--${part(grpLabel, grp)}`.slice(0, 200);
     const note = $("#payMemo");
     if (note) note.textContent = `${I18.t("Memo on your contribution:")} ${projLabel} · ${grpLabel}`;
+
+    // The monthly amount is the group's headcount, so it is spelled out here
+    // rather than first appearing on Stripe's page.
+    const M = D.membership || {};
+    const each = Number(M.monthlyPerPerson || 0) * (1 + Number(M.adminPct || 0) / 100);
+    const n = grp ? Math.round(Number(grp.participants) || 0) : 0;
+    const total = $("#payMonthlyTotal"), btn = $('#payGrid [data-checkout="subscription"]');
+    if (total) {
+      total.innerHTML = !grp
+        ? esc(I18.t("Pick a group above and the monthly amount appears here."))
+        : n > 0
+          ? `<b>${n} ${n === 1 ? esc(I18.t("person")) : esc(I18.t("people"))} × ${esc(usd(each))} = ${esc(usd(n * each))} ${esc(I18.t("per month"))}</b><br><span>${esc(I18.t("This is what you will be charged every month. It stays at this amount even if the group's size changes later."))}</span>`
+          : esc(I18.t("That group has no headcount on file yet, so a monthly amount cannot be worked out."));
+    }
+    if (btn) btn.disabled = !(grp && n > 0);
   }
 
   function syncMemberType(clearSize) {
@@ -977,7 +1042,7 @@
     const input = $("#memberSizeWrap input");
     const n = input && !$("#memberSizeWrap").hidden ? Math.min(2000, Math.max(0, Math.round(Number(input.value) || 0))) : 0;
     note.innerHTML = n
-      ? `<p><b>${n} ${n === 1 ? I18.t("person") : I18.t("people")} × ${usd(each)} = ${usd(n * each)} ${I18.t("per month")}</b> — ${usd(n * rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing. An admin can change your headcount at any time and the amount follows it.")}</p>`
+      ? `<p><b>${n} ${n === 1 ? I18.t("person") : I18.t("people")} × ${usd(each)} = ${usd(n * each)} ${I18.t("per month")}</b> — ${usd(n * rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing. Your monthly amount is fixed when you set it up — it does not change if the group's size changes later.")}</p>`
       : `<p>${I18.t("Monthly maintenance is")} <b>${usd(each)} ${I18.t("per person, per month")}</b> — ${usd(rate)} ${I18.t("toward upkeep plus")} ${pct}% ${I18.t("for administration and processing.")}</p>`;
   }
 
