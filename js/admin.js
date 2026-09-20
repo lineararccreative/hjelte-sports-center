@@ -150,7 +150,14 @@
       if (isMaster() && data.subscriberStats) tiles.push([data.subscriberStats.confirmed, "Confirmed subscribers"], [data.subscriberStats.quotaLeft, "Emails left today"], [(data.submissions || []).filter((s) => s.status === "pending").length, "Pending submissions"], [(data.admins || []).length, "Admins"]);
       P.innerHTML = `<p class="panel-note">Signed in as <b>${esc(me.email)}</b>${isMaster() ? " — you can edit everything on the hub." : ` — you can edit ${myGroups().map((g) => `<b>${esc(g.name)}</b>`).join(", ") || "no groups yet (ask the master admin to assign one)"}.`}</p>
         <div class="tiles">${tiles.map(([v, l]) => `<div class="tile"><strong>${v}</strong><span>${l}</span></div>`).join("")}</div>
-        <p class="panel-note">Public site last updated: <b>${esc(data.lastUpdated || "—")}</b>. Every change you save here updates the public page within a minute.</p>`;
+        <p class="panel-note">Public site last updated: <b>${esc(data.lastUpdated || "—")}</b>. Every change you save here updates the public page within a minute.</p>` +
+        (isMaster() ? `<div class="mail-switch ${data.emailsPaused ? "is-paused" : "is-on"}">
+          <div><strong>Outgoing email: ${data.emailsPaused ? "paused" : "on"}</strong>
+          <span>${data.emailsPaused
+            ? "Only admin sign-in codes are being sent. Welcome emails, new-group alerts, subscriber confirmations and the daily digest are all held back."
+            : "Everything is sending: welcome emails, new-group alerts, subscriber confirmations and the daily digest."}</span></div>
+          <button class="btn ${data.emailsPaused ? "btn-primary" : "btn-outline"} btn-sm" data-act="toggleEmails">${data.emailsPaused ? "Turn email on" : "Pause email"}</button>
+        </div>` : "");
     },
     schedule(P, A) {
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newSchedule">+ Add weekly block</button>`;
@@ -336,6 +343,14 @@
     },
     verifyWork: (id) => api("verifyWorkLog", { data: { id, verified: true } }).then(refresh).then(() => toast("Verified.")).catch((e) => toast(e.message, true)),
     delWork: (id) => confirm("Delete this work entry?") && api("deleteWorkLog", { data: { id } }).then(refresh).then(() => toast("Deleted.")).catch((e) => toast(e.message, true)),
+    /* email switch — sign-in codes are never paused, so this can't lock anyone out */
+    toggleEmails: () => {
+      const on = !!data.emailsPaused; // paused now means we are turning it on
+      if (!on && !confirm("Turn outgoing email back on?\n\nWelcome emails, new-group alerts, subscriber confirmations and the daily 7am digest will start sending again.")) return;
+      api("setEmailsSending", { data: { on } }).then(refresh)
+        .then(() => toast(on ? "Email is on." : "Email paused — sign-in codes still send."))
+        .catch((e) => toast(e.message, true));
+    },
     /* groups */
     newGroup: () => ACTIONS.editGroup(null),
     editGroup: (id, dup) => {

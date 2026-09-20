@@ -59,6 +59,14 @@ html { scroll-padding-top: calc(var(--header-h) + 78px); }
    grows past the panel and covers the Save button in the footer. */
 /* Sits between the title and the form so aria-describedby reads it out with
    the dialog's name; `hidden` when the drawer is an edit rather than a copy. */
+/* Outgoing-email switch on the Overview tab. Amber while paused so it reads
+   as a deliberate hold rather than an error. */
+.mail-switch { display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  margin-top: 18px; padding: 16px 18px; border-radius: var(--radius); border: 1px solid var(--line); background: #fff; }
+.mail-switch.is-paused { border-color: #E4C97A; background: #FDF8EC; }
+.mail-switch strong { display: block; font-size: .95rem; margin-bottom: 2px; }
+.mail-switch span { font-size: .85rem; color: var(--muted); display: block; max-width: 62ch; }
+.mail-switch .btn { flex: none; }
 .drawer-hint { margin: 0; padding: 14px 24px 0; flex: none; }
 .drawer-panel .form-grid { padding: 20px 24px; overflow: auto; flex: 1 1 auto; min-height: 0; align-content: start; }
 .drawer-panel .form-grid label { font-size: .78rem; }

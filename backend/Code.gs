@@ -157,6 +157,19 @@ function meta(key) {
   return /^#[A-Z]+!?$/.test(v) ? "" : v; // a spreadsheet error cell is not a value
 }
 function setMeta(key, value) { upsertRow("Meta", "key", { key, value }); }
+/* Every outbound email goes through here. While emails are paused only the
+   sign-in code still sends, so an admin can always get back in; everything
+   else is skipped and written to the log instead of the outside world.
+   Paused by default: getMeta returns "" until someone turns sending on. */
+function emailsPaused() { return String(getMeta("emailsSending")) !== "1"; }
+function sendMail_(kind, opts) {
+  if (kind !== "auth" && emailsPaused()) {
+    Logger.log("email paused (" + kind + ") -> " + opts.to + " :: " + opts.subject);
+    return false;
+  }
+  MailApp.sendEmail(opts);
+  return true;
+}
 function touch() { setMeta("lastUpdated", todayISO()); }
 function nowISO() { return new Date().toISOString(); }
 function todayISO() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"); }
@@ -292,7 +305,7 @@ function joinCommunity(d) {
   upsertRow("Members", "id", rec);
 
   try {
-    MailApp.sendEmail({
+    sendMail_("member", {
       to: email,
       subject: "You are on the Hjelte community list",
       htmlBody: "<p>Thanks for joining the Hjelte Sports Center community list, " + escapeHtml_(name) + ".</p>" +
@@ -352,6 +365,8 @@ function doPost(e) {
       case "subscribers": requireMaster(admin); return json({ ok: true, subscribers: rows("Subscribers").map((s) => ({ email: s.email, sports: s.sports, confirmed: s.confirmed, createdAt: s.createdAt })) });
       case "sendDigestNow": requireMaster(admin); return json(sendDailyDigest(true));
       case "setLastUpdated": requireMaster(admin); setMeta("lastUpdated", d.date || todayISO()); return json({ ok: true });
+      // Sign-in codes are never affected by this; only the master can flip it.
+      case "setEmailsSending": return json(withLock(() => { requireMaster(admin); setMeta("emailsSending", d.on ? "1" : ""); return { ok: true, emailsPaused: emailsPaused() }; }));
       default: return json({ ok: false, error: "Unknown action" });
     }
   } catch (err) {
@@ -383,7 +398,7 @@ function requestCode(email) {
   // code — and the address is public, so anyone could trigger that. Brute
   // force is bounded by the request throttle above instead.
   upsertRow("Auth", "email", Object.assign(existing, { code, codeExpires: expires, attempts: 0 }));
-  MailApp.sendEmail({
+  sendMail_("auth", {
     to: email,
     subject: `${code} is your ${SITE_NAME} sign-in code`,
     htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">Your sign-in code for the <b>${SITE_NAME}</b> admin center:</p>
@@ -438,7 +453,8 @@ function adminData(admin) {
     updates: rows("Updates").filter((u) => isMaster(admin) || own(u) || u.author === admin.email).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))),
     projects: rows("Projects"),
     worklog: rows("WorkLog").filter(own).sort((a, b) => String(b.date).localeCompare(String(a.date))),
-    lastUpdated: meta("lastUpdated")
+    lastUpdated: meta("lastUpdated"),
+    emailsPaused: emailsPaused()
   };
   if (isMaster(admin)) {
     out.submissions = rows("Submissions").sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
@@ -559,7 +575,7 @@ function addAdmin(admin, d) {
   const rec = { email, role: email === MASTER_EMAIL ? "master" : "community", groupIds: d.groupIds || [], name: oneLine(d.name, 80), addedBy: admin.email, addedAt: nowISO() };
   upsertRow("Admins", "email", rec);
   if (d.notify !== false) {
-    MailApp.sendEmail({ to: email, subject: `You're an admin on the ${SITE_NAME}`,
+    sendMail_("adminInvite", { to: email, subject: `You're an admin on the ${SITE_NAME}`,
       htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">You've been added as a <b>${rec.role} admin</b> on the ${SITE_NAME}.</p>
         <p style="font-family:Inter,system-ui,sans-serif">Sign in with this email address at <a href="${SITE_URL}admin.html">${SITE_URL}admin.html</a>. A 6-digit code is emailed to you each time you sign in.</p>` });
   }
@@ -599,7 +615,7 @@ function submitGroup(f) {
   Object.keys(s).forEach((k) => { if (SCHEMA.Submissions.indexOf(k) === -1) delete s[k]; else if (typeof s[k] === "string") s[k] = s[k].slice(0, 1200); });
   s.website = cleanUrl(s.website); s.groupName = oneLine(s.groupName, 120);
   appendRow("Submissions", s);
-  MailApp.sendEmail({ to: MASTER_EMAIL, subject: `[Hjelte Hub] New group submission: ${oneLine(f.groupName, 80)}`,
+  sendMail_("submission", { to: MASTER_EMAIL, subject: `[Hjelte Hub] New group submission: ${oneLine(f.groupName, 80)}`,
     htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">A new group asked to be listed. Review it in the admin center → Submissions.</p><pre>${escapeHtml(JSON.stringify(s, null, 2))}</pre>` });
   return { ok: true };
 }
@@ -620,7 +636,7 @@ function subscribe(b) {
   upsertRow("Subscribers", "email", rec);
   if (!rec.confirmed) {
     const url = ScriptApp.getService().getUrl() + "?action=confirm&token=" + rec.token;
-    MailApp.sendEmail({ to: email, subject: `Confirm your ${SITE_NAME} updates`,
+    sendMail_("subscribeConfirm", { to: email, subject: `Confirm your ${SITE_NAME} updates`,
       htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">Tap to confirm you'd like updates for <b>${sports.join(", ")}</b> at Hjelte Sports Center:</p>
         <p><a href="${url}" style="font-family:Inter,system-ui,sans-serif;background:#2E7D4F;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:600">Confirm subscription</a></p>
         <p style="font-family:Inter,system-ui,sans-serif;color:#555">If you didn't sign up, ignore this email.</p>` });
@@ -642,6 +658,10 @@ function unsubscribe(token) {
 
 /* --------------------------------------------------------------- digest */
 function sendDailyDigest(force) {
+  // Stop before any bookkeeping. The loop below stamps lastSentAt and sentAt
+  // as it goes, so running it while paused would mark updates as delivered
+  // and quietly drop them from the first digest after email resumes.
+  if (emailsPaused()) { Logger.log("Daily digest skipped — outgoing email is paused."); return { ok: true, sent: 0, skipped: 0, paused: true }; }
   const since = new Date(Date.now() - 26 * 3600000); // slight overlap so nothing is missed
   const updates = rows("Updates").filter((u) => new Date(u.createdAt) > since);
   const today = todayISO(), weekOut = Utilities.formatDate(new Date(Date.now() + 7 * 86400000), Session.getScriptTimeZone(), "yyyy-MM-dd");
@@ -666,7 +686,7 @@ function sendDailyDigest(force) {
       <p style="margin-top:20px"><a href="${SITE_URL}#schedule" style="background:#1C1F22;color:#fff;padding:10px 16px;border-radius:999px;text-decoration:none;font-weight:600">See the full schedule</a></p>
       <p style="color:#8A8F95;font-size:12px;margin-top:24px">Schedules are a community information resource and may change. Official permits and City of Los Angeles Department of Recreation and Parks requirements govern facility use.<br>
       <a href="${base}?action=unsubscribe&token=${s.token}" style="color:#8A8F95">Unsubscribe</a></p></div>`;
-    MailApp.sendEmail({ to: s.email, subject: oneLine(`Hjelte update · ${myUpdates[0] ? myUpdates[0].title : myEvents[0].title}`, 120), htmlBody: html });
+    sendMail_("digest", { to: s.email, subject: oneLine(`Hjelte update · ${myUpdates[0] ? myUpdates[0].title : myEvents[0].title}`, 120), htmlBody: html });
     s.lastSentAt = nowISO(); upsertRow("Subscribers", "email", s); sent++;
   }
   updates.forEach((u) => { if (!u.sentAt) { u.sentAt = nowISO(); upsertRow("Updates", "id", u); } });
