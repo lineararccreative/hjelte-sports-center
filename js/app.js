@@ -884,7 +884,7 @@
 
     const pay = [
       { key: "monthly", title: "Monthly maintenance", text: `$${D.membership.monthlyPerPerson} per person per month from your group, toward the upkeep the City does not cover — mowing help, materials, small repairs.`, cta: "Set up a monthly contribution", icon: "hands" },
-      { key: "oneTime", title: "One-time toward a project", text: "Put something toward a specific project from the list — restrooms, irrigation, signage.", cta: "Make a one-time contribution", icon: "target" }
+      { key: "oneTime", title: "One-time toward a project", text: "Choose your own amount and pick the project it goes to — restrooms, irrigation, signage, or wherever it is needed most. That choice travels with the contribution.", cta: "Make a one-time contribution", icon: "target" }
     ];
     $("#payGrid").innerHTML = pay.map((o) => {
       const url = safeUrl((D.membership.stripe || {})[o.key]);

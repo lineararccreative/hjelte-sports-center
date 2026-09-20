@@ -445,7 +445,13 @@ window.HJELTE = {
     /* Monthly maintenance is priced per person: the group's headcount, taken
        at intake and editable by an admin, times this rate. */
     monthlyPerPerson: 10,
-    stripe: { monthly: "", oneTime: "" }
+    /* Stripe Payment Links (live, Los Angeles Cricket account). Card details
+       never touch this site; the project dropdown on Stripe's page becomes
+       the memo on the contribution. */
+    stripe: {
+      monthly: "https://buy.stripe.com/00w9ATg1fdC12ka4T9abK00",
+      oneTime: "https://buy.stripe.com/dRm4gzdT70Pf0c20CTabK01"
+    }
   },
 
   contribute: [
