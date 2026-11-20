@@ -22,7 +22,7 @@ window.HJELTE = {
     // to the file's last-modified date.
     lastUpdated: "2026-09-18",
     // Where form submissions and contact buttons go (mailto fallback).
-    contactEmail: "teamla@losangelescricket.org",
+    contactEmail: "hjeltecommunitycenter@gmail.com",
     // Optional: set to a Formspree / Google Apps Script / Netlify endpoint
     // to POST forms instead of opening the visitor's email client.
     formEndpoint: "",
