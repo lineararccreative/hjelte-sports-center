@@ -62,6 +62,20 @@ const NUM_FIELDS = { day: 1, goal: 1, raised: 1, hours: 1, volunteers: 1, attemp
 const TIME_FIELDS = { start: 1, end: 1 };
 const DATE_FIELDS = { date: 1 };
 const TEXT_COLUMNS = { Schedule: ["start", "end"], Events: ["date", "start", "end"], WorkLog: ["date"], Meta: ["value"], Projects: ["targetDate"] };
+// Ids and phone numbers are text even when they are all digits. Sheets stores
+// the string "12345678" as the number 12345678, and a number never === the
+// string the browser sends back: Edit then made a copy and Delete found
+// nothing. These keys are always written and read as text.
+const TEXT_FIELDS = { id: 1, groupId: 1, phone: 1 };
+// Fixed lists, mirrored from js/data.js. Anything outside them is refused
+// rather than stored, because these values end up in page markup and filters.
+const SPORT_IDS = ["baseball", "softball", "cricket", "soccer", "disc", "fitness", "youth", "community", "other"];
+const CATEGORY_IDS = ["permitted", "community", "open", "maintenance"];
+const AGE_GROUPS = ["Youth", "Adult", "Mixed"];
+const PROJECT_STATUSES = ["PROPOSED", "PLANNING", "FUNDRAISING", "IN PROGRESS", "COMPLETED"];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_RE = /^([01]?\d|2[0-3]):([0-5]\d)$/;
+const DIGEST_MAX_AGE_DAYS = 7;     // news older than this is not emailed; mirrored in js/admin.js
 
 /* ---------------------------------------------------------------- setup */
 function setup() {
@@ -102,8 +116,31 @@ function sheet(name) {
   return sh;
 }
 function pad2(n) { return String(n).length < 2 ? "0" + n : String(n); }
+/* Text that reaches the Sheet is data, and Sheets must store it as typed.
+   Left alone, Sheets reinterprets what it is given:
+
+     • a value starting with = + - or @ is evaluated as a formula, and a
+       formula can read any tab, including the sign-in tokens;
+     • "12345678" becomes a number, "6-8" and "10/12" become dates, "1e3"
+       becomes 1000 and "true" becomes a checkbox value.
+
+   So any text Sheets would not take literally goes in behind a leading
+   apostrophe. That is Sheets' own "this is text" marker; it is not part of
+   the stored value. Time and date columns are exempt: their values are
+   validated to one exact format and their columns are plain-text already. */
+function needsTextGuard_(key, s) {
+  if (TIME_FIELDS[key] || DATE_FIELDS[key]) return false;
+  return /^[\s\u0000-\u001f\u200b-\u200d\ufeff]*[=+\-@]/.test(s)   // would run as a formula
+    || /^['\d.]/.test(s)                                           // a number, date, time or fraction — or the marker itself
+    || /^(true|false)$/i.test(s.trim());                           // would become TRUE / FALSE
+}
+function guardText_(key, s) { return needsTextGuard_(key, s) ? "'" + s : s; }
+// A cell already formatted as plain text keeps the marker, so drop it on the way out.
+function unguardText_(key, s) { return s.charAt(0) === "'" && needsTextGuard_(key, s.slice(1)) ? s.slice(1) : s; }
 function fromCell(key, v) {
   if (v === "" || v === null || v === undefined) return LIST_FIELDS[key] ? [] : (BOOL_FIELDS[key] ? false : "");
+  if (typeof v === "string") v = unguardText_(key, v);
+  if (TEXT_FIELDS[key]) return String(v);
   if (LIST_FIELDS[key]) return String(v).split("|").filter(Boolean).map((x) => (key === "days" ? Number(x) : x));
   if (BOOL_FIELDS[key]) return v === true || String(v).toUpperCase() === "TRUE";
   if (TIME_FIELDS[key]) {
@@ -122,10 +159,10 @@ function fromCell(key, v) {
 }
 function toCell(key, v) {
   if (v === null || v === undefined) return "";
-  if (LIST_FIELDS[key]) return Array.isArray(v) ? v.join("|") : String(v);
   if (BOOL_FIELDS[key]) return !!v;
-  if (NUM_FIELDS[key]) return v === "" ? "" : Number(v);
-  return typeof v === "object" ? JSON.stringify(v) : String(v);
+  if (NUM_FIELDS[key]) { if (v === "") return ""; const n = Number(v); return Number.isFinite(n) ? n : ""; }
+  const s = LIST_FIELDS[key] ? (Array.isArray(v) ? v.join("|") : String(v)) : (typeof v === "object" ? JSON.stringify(v) : String(v));
+  return guardText_(key, s);
 }
 function rows(name) {
   const sh = sheet(name), last = sh.getLastRow();
@@ -145,8 +182,20 @@ function findRowIndex(name, keyField, value) {
   if (last < 2) return -1;
   const col = SCHEMA[name].indexOf(keyField) + 1;
   const vals = sh.getRange(2, col, last - 1, 1).getValues();
-  for (let i = 0; i < vals.length; i++) if (String(vals[i][0]) === String(value)) return i + 2;
+  // Keys are compared the way rows() would read them, and an email key
+  // without regard to case: an address typed into the sheet by hand as
+  // "Bob@Club.org" must still be found, or removing that admin did nothing.
+  const norm = (x) => { const s = unguardText_(keyField, String(x)); return keyField === "email" ? s.toLowerCase() : s; };
+  const want = norm(value);
+  for (let i = 0; i < vals.length; i++) if (norm(vals[i][0]) === want) return i + 2;
   return -1;
+}
+// True when any cell of that row is a formula. Nothing this script writes can
+// be one; a row saved before that was enforced might hold one.
+function rowHasFormula_(name, keyField, value) {
+  const i = findRowIndex(name, keyField, value);
+  if (i === -1) return false;
+  return sheet(name).getRange(i, 1, 1, SCHEMA[name].length).getFormulas()[0].some((f) => !!f);
 }
 function upsertRow(name, keyField, obj) {
   const i = findRowIndex(name, keyField, obj[keyField]);
@@ -163,6 +212,22 @@ function deleteRowBy(name, keyField, value) {
   if (i !== -1) { sheet(name).deleteRow(i); SpreadsheetApp.flush(); }
   return i !== -1;
 }
+function deleteRowsWhere_(name, field, value) { let n = 0; while (deleteRowBy(name, field, value)) n++; return n; }
+/* Writes one cell of an existing row and nothing else. A whole-row upsert
+   from a copy read earlier would put back a row someone deleted in the
+   meantime (an unsubscribe during a digest run) or undo a concurrent edit. */
+function setCell_(name, keyField, keyValue, field, value) {
+  const i = findRowIndex(name, keyField, keyValue);
+  if (i === -1) return false;
+  sheet(name).getRange(i, SCHEMA[name].indexOf(field) + 1).setValue(toCell(field, value));
+  SpreadsheetApp.flush();
+  return true;
+}
+// Ids are compared as text on both sides; a blank id matches nothing.
+function byId_(list, id) {
+  const k = String(id === null || id === undefined ? "" : id);
+  return k ? (list.find((x) => String(x.id) === k) || null) : null;
+}
 function meta(key) {
   const r = rows("Meta").find((m) => m.key === key);
   const v = r ? String(r.value) : "";
@@ -175,18 +240,36 @@ function setMeta(key, value) { upsertRow("Meta", "key", { key, value }); }
    Paused by default: meta() returns "" until someone turns sending on.
    NB: the reader is meta(), not getMeta() — only setMeta() has the prefix. */
 function emailsPaused() { return String(meta("emailsSending")) !== "1"; }
+/* Sign-in codes share Google's daily email allowance with everything else,
+   and the public forms can each trigger an email. The last few sends of the
+   day are therefore kept back for sign-in codes, so a burst of sign-ups or
+   subscriptions can never leave an admin unable to get in. */
+const MAIL_RESERVE_FOR_SIGN_IN = 15;
 function sendMail_(kind, opts) {
   if (kind !== "auth" && emailsPaused()) {
     Logger.log("email paused (" + kind + ") -> " + opts.to + " :: " + opts.subject);
     return false;
   }
+  if (kind !== "auth" && MailApp.getRemainingDailyQuota() <= MAIL_RESERVE_FOR_SIGN_IN) {
+    Logger.log("email held back, daily allowance nearly used (" + kind + ") -> " + opts.to + " :: " + opts.subject);
+    return false;
+  }
   MailApp.sendEmail(opts);
   return true;
+}
+/* For mail that accompanies something already saved: a failed or paused send
+   must not turn a successful save into an error, and the caller needs to know
+   whether the email really went so it never tells anyone to check an inbox
+   that will stay empty. Returns true only when the message was handed over. */
+function safeSend_(kind, opts) {
+  try { return sendMail_(kind, opts); }
+  catch (err) { Logger.log("email failed (" + kind + ") -> " + opts.to + " :: " + err); return false; }
 }
 function touch() { setMeta("lastUpdated", todayISO()); }
 function nowISO() { return new Date().toISOString(); }
 function todayISO() { return Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd"); }
-function uid() { return Utilities.getUuid().slice(0, 8); }
+// Starts with a letter so Sheets can never read a new id as a number.
+function uid() { return "r" + Utilities.getUuid().replace(/-/g, "").slice(0, 8); }
 function withLock(fn) {
   const lock = LockService.getScriptLock(); lock.waitLock(20000);
   try { return fn(); } finally { lock.releaseLock(); }
@@ -206,17 +289,26 @@ function cleanPhone(p) {
 }
 function cleanUrl(u) { const v = String(u || "").trim(); return /^https?:\/\//i.test(v) ? v.slice(0, 300) : ""; }
 function oneLine(s, max) { return String(s || "").replace(/[\r\n]+/g, " ").slice(0, max || 200); }
-// Small fixed-window throttle. Apps Script gives us no client IP, so the key is
-// the action plus the target address; a global counter caps total abuse volume.
+function cleanTime_(t) {
+  const m = String(t === null || t === undefined ? "" : t).trim().match(TIME_RE);
+  return m ? pad2(Number(m[1])) + ":" + m[2] : "";
+}
+function pick_(v, allowed) { return allowed.indexOf(String(v)) !== -1 ? String(v) : ""; }
+/* Fixed-window throttle. The window is part of the cache key, so a refused
+   call cannot push the expiry forward. Before, every blocked attempt restarted
+   the clock, and anyone pinging an admin's address kept sign-in codes switched
+   off for as long as they kept pinging. Apps Script gives us no client IP, so
+   the key is the action plus the target address; a global counter caps total
+   abuse volume. Cache keys are limited to 250 characters. */
 function throttle(key, limit, windowSec) {
   const cache = CacheService.getScriptCache();
-  const k = "t:" + key;
+  const k = ("t:" + key).slice(0, 200) + ":" + Math.floor(Date.now() / (windowSec * 1000));
   const n = Number(cache.get(k) || 0) + 1;
   cache.put(k, String(n), windowSec);
   if (n > limit) throw new Error("Too many requests. Please try again later.");
   return n;
 }
-function throttleGlobal(action, limit) { throttle("g:" + action + ":" + Math.floor(Date.now() / 3600000), limit, 3600); }
+function throttleGlobal(action, limit) { throttle("g:" + action, limit, 3600); }
 
 /* ------------------------------------------------------------- responses */
 function json(obj) {
@@ -236,8 +328,9 @@ function doGet(e) {
   try {
     switch (p.action) {
       case "data": return json(publicData());
-      case "confirm": return confirmSubscriber(p.token);
-      case "unsubscribe": return unsubscribe(p.token);
+      // both write to the sheet, so they take the same lock every other write does
+      case "confirm": return withLock(() => confirmSubscriber(p.token));
+      case "unsubscribe": return withLock(() => unsubscribe(p.token));
       case "ping": return json({ ok: true, time: nowISO() });
       default: return page(SITE_NAME + " API", "This is the data service for the community hub website.");
     }
@@ -247,26 +340,32 @@ function doGet(e) {
 }
 function publicData() {
   const groups = rows("Groups").filter((g) => g.status === "approved");
-  const admins = rows("Admins");
-  const displayName = (email) => {
-    const a = admins.find((x) => String(x.email).toLowerCase() === String(email).toLowerCase());
-    return a && a.name ? a.name : "Hub maintainers";
-  };
-  // Admin email addresses never leave the sheet: author falls back to a name,
-  // and the work log's addedBy column is dropped entirely.
+  const byline = bylineFor_(rows("Admins"));
+  // Admin email addresses never leave the sheet: an author that is an address
+  // becomes a name, and the bookkeeping columns that record who saved a row
+  // (updatedBy on schedule blocks and events, addedBy on the work log) are
+  // dropped from everything public.
+  const strip = (r) => { delete r.updatedBy; delete r.addedBy; return r; };
   const updates = rows("Updates").sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))).slice(0, 40)
-    .map((u) => { if (EMAIL_RE.test(u.author)) u.author = displayName(u.author); return u; });
-  const worklog = rows("WorkLog").sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 200)
-    .map((w) => { delete w.addedBy; return w; });
+    .map((u) => { u.author = byline(u.author); return u; });
+  const worklog = rows("WorkLog").sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 200).map(strip);
   return {
     ok: true,
-    lastUpdated: /^\d{4}-\d{2}-\d{2}$/.test(meta("lastUpdated")) ? meta("lastUpdated") : todayISO(),
+    lastUpdated: DATE_RE.test(meta("lastUpdated")) ? meta("lastUpdated") : todayISO(),
     groups,
-    schedule: rows("Schedule"),
-    specialEvents: rows("Events"),
+    schedule: rows("Schedule").map(strip),
+    specialEvents: rows("Events").map(strip),
     updates,
     projects: rows("Projects"),
     worklog
+  };
+}
+// An author stored as an email address is shown as that admin's name instead.
+function bylineFor_(admins) {
+  return (author) => {
+    if (!EMAIL_RE.test(String(author))) return author;
+    const a = admins.find((x) => String(x.email).toLowerCase() === String(author).toLowerCase());
+    return a && a.name ? a.name : "Hub maintainers";
   };
 }
 
@@ -280,20 +379,28 @@ function publicData() {
 const MEMBER_TYPES = ["Individual", "Community group", "Permitted organization", "Business"];
 const MEMBER_INTERESTS = ["Monthly maintenance", "One-time project support", "Volunteer time", "Materials or equipment"];
 
-function joinCommunity(d) {
-  // a bot filled the hidden field, or came back faster than a person can type
-  if (String(d.website2 || "").trim()) return { ok: true };
-  // a missing timestamp is treated as "too fast" — otherwise the guard is
-  // skipped simply by leaving the field out of a scripted POST
+/* The two public forms carry a hidden field only a bot fills in, and the time
+   the form was drawn. That time is the VISITOR's clock, so it is only trusted
+   to show a form came back implausibly fast: a device running a few minutes
+   ahead produces a negative gap, and treating that as "too fast" silently
+   dropped real sign-ups. A missing timestamp still counts as a bot, otherwise
+   the check is skipped simply by leaving the field out of a scripted POST. */
+function looksAutomated_(d) {
+  if (String(d.website2 || "").trim()) return true;
   const started = Number(d.formTs || 0);
-  if (!started || Date.now() - started < 3000) return { ok: true };
+  if (!started) return true;
+  const gap = Date.now() - started;
+  return gap >= 0 && gap < 3000;
+}
+function joinCommunity(d) {
+  if (looksAutomated_(d)) return { ok: true };
 
   throttleGlobal("join", 60);
   const email = String(d.email || "").trim().toLowerCase();
   const phone = cleanPhone(d.phone);
-  if (!validEmail(email)) throw new Error("Please enter a valid email address.");
+  if (!validEmail(email) || email.length > 254) throw new Error("Please enter a valid email address.");
   if (!phone) throw new Error("Please enter a valid phone number so we can reach you.");
-  const name = oneLine(d.name, 120);
+  const name = oneLine(d.name, 120).trim();
   if (!name) throw new Error("Please enter your name.");
   throttle("join:" + email, 3, 3600);
 
@@ -302,34 +409,38 @@ function joinCommunity(d) {
     .map(function (x) { return String(x).trim(); })
     .filter(function (x) { return MEMBER_INTERESTS.indexOf(x) !== -1; });
 
+  /* This form is open to anyone, so an address already on the list keeps the
+     record it has: otherwise whoever knows a member's email could replace that
+     member's name and phone. The reply and the email are the same either way,
+     so the form cannot be used to find out who is a member. */
   const existing = rows("Members").filter(function (m) { return String(m.email).toLowerCase() === email; })[0];
-  const rec = {
-    id: existing ? existing.id : uid(),
-    createdAt: existing ? existing.createdAt : nowISO(),
+  const rec = existing || {
+    id: uid(),
+    createdAt: nowISO(),
     name: name, email: email, phone: phone,
     memberType: type,
     groupName: oneLine(d.groupName, 120),
     orgSize: Math.max(1, Math.min(2000, Math.round(Number(d.orgSize) || 1))),
     interests: interests,
     notes: oneLine(d.notes, 400),
-    status: existing ? existing.status : "active",
+    status: "active",
     updatedAt: nowISO()
   };
-  upsertRow("Members", "id", rec);
+  if (!existing) appendRow("Members", rec);
 
-  try {
-    sendMail_("member", {
-      to: email,
-      subject: "You are on the Hjelte community list",
-      htmlBody: "<p>Thanks for joining the Hjelte Sports Center community list, " + escapeHtml_(name) + ".</p>" +
-        "<p>We have your email and your phone on file, so we can reach you about field news, work days and the projects you said you were interested in.</p>" +
-        (interests.length ? "<p>You told us you would like to help with: " + escapeHtml_(interests.join(", ")) + ".</p>" : "") +
-        "<p>Nothing has been charged and no payment details were collected here. If you chose to contribute toward monthly maintenance or a project, you will do that yourself from the community page whenever you are ready.</p>" +
-        "<p>— Hjelte Sports Center community hub</p>"
-    });
-  } catch (err) { /* the record is saved either way */ }
-
-  return { ok: true, member: { id: rec.id, name: rec.name, email: rec.email } };
+  // No name in the greeting: the form is public, and whatever is typed into it
+  // would otherwise arrive in someone's inbox under the hub's name.
+  const emailed = safeSend_("member", {
+    to: email,
+    subject: "You are on the Hjelte community list",
+    htmlBody: "<p>Thanks for joining the Hjelte Sports Center community list.</p>" +
+      "<p>We have your email and your phone on file, so we can reach you about field news, work days and the projects you said you were interested in.</p>" +
+      (rec.interests.length ? "<p>You told us you would like to help with: " + escapeHtml_(rec.interests.join(", ")) + ".</p>" : "") +
+      "<p>Nothing has been charged and no payment details were collected here. If you chose to contribute toward monthly maintenance or a project, you will do that yourself from the community page whenever you are ready.</p>" +
+      "<p>— Hjelte Sports Center community hub</p>"
+  });
+  // "emailed" lets the page say "check your email" only when one really went.
+  return { ok: true, emailed: emailed };
 }
 function escapeHtml_(s) {
   return String(s || "").replace(/[&<>"']/g, function (c) {
@@ -340,34 +451,42 @@ function escapeHtml_(s) {
 function doPost(e) {
   let body = {};
   try { body = JSON.parse((e.postData && e.postData.contents) || "{}"); } catch (err) { return json({ ok: false, error: "Bad JSON" }); }
+  // JSON "null", a number or a list parse fine but are not a request
+  if (!body || typeof body !== "object" || Array.isArray(body)) return json({ ok: false, error: "Bad JSON" });
   const action = body.action;
+  const payload = body.data && typeof body.data === "object" && !Array.isArray(body.data) ? body.data : {};
   try {
     // public actions
     if (action === "subscribe") return json(withLock(() => subscribe(body)));
-    if (action === "submitGroup") return json(withLock(() => submitGroup(body.data || {})));
-    if (action === "joinCommunity") return json(withLock(() => joinCommunity(body.data || {})));
-    if (action === "createCheckout") return json(createCheckout(body.data || {}));
+    if (action === "submitGroup") return json(withLock(() => submitGroup(payload)));
+    if (action === "joinCommunity") return json(withLock(() => joinCommunity(payload)));
+    if (action === "createCheckout") return json(createCheckout(payload));
     if (action === "requestCode") return json(withLock(() => requestCode(body.email)));
     if (action === "verifyCode") return json(withLock(() => verifyCode(body.email, body.code)));
+    // Holding the token is the proof; this ends the session on the server, so
+    // a token copied from a shared computer stops working at sign-out.
+    if (action === "logout") return json(logout(body.token));
     // admin actions
     const admin = auth(body.token);
-    const d = body.data || {};
+    const d = payload;
+    // ids arrive as text and are kept that way, so they compare equal to the sheet
+    ["id", "groupId"].forEach((k) => { if (d[k] !== undefined && d[k] !== null) d[k] = String(d[k]); });
     switch (action) {
       case "me": return json({ ok: true, admin: publicAdmin(admin) });
       case "adminData": return json(adminData(admin));
       case "saveGroup": return json(withLock(() => saveGroup(admin, d)));
-      case "deleteGroup": return json(withLock(() => { requireMaster(admin); deleteRowBy("Groups", "id", d.id); touch(); return { ok: true }; }));
+      case "deleteGroup": return json(withLock(() => deleteGroup(admin, d)));
       case "saveSchedule": return json(withLock(() => saveScheduleLike("Schedule", admin, d)));
       case "deleteSchedule": return json(withLock(() => deleteScheduleLike("Schedule", admin, d.id)));
       case "saveEvent": return json(withLock(() => saveScheduleLike("Events", admin, d)));
       case "deleteEvent": return json(withLock(() => deleteScheduleLike("Events", admin, d.id)));
       case "postUpdate": return json(withLock(() => postUpdate(admin, d)));
       case "deleteUpdate": return json(withLock(() => deleteUpdate(admin, d.id)));
-      case "saveProject": return json(withLock(() => { requireMaster(admin); const prev = d.id ? rows("Projects").find((x) => x.id === d.id) : null; const p = Object.assign({}, d, { id: (prev && prev.id) || uid(), updatedAt: nowISO() }); upsertRow("Projects", "id", p); touch(); return { ok: true, project: p }; }));
+      case "saveProject": return json(withLock(() => saveProject(admin, d)));
       case "deleteProject": return json(withLock(() => { requireMaster(admin); deleteRowBy("Projects", "id", d.id); touch(); return { ok: true }; }));
       case "addWorkLog": return json(withLock(() => addWorkLog(admin, d)));
       case "deleteWorkLog": return json(withLock(() => deleteWorkLog(admin, d.id)));
-      case "verifyWorkLog": return json(withLock(() => { requireMaster(admin); const w = rows("WorkLog").find((x) => x.id === d.id); if (!w) throw new Error("Not found"); w.verified = !!d.verified; upsertRow("WorkLog", "id", w); return { ok: true }; }));
+      case "verifyWorkLog": return json(withLock(() => { requireMaster(admin); if (!setCell_("WorkLog", "id", d.id, "verified", !!d.verified)) throw new Error("Not found"); touch(); return { ok: true }; }));
       case "addAdmin": return json(withLock(() => addAdmin(admin, d)));
       // Compare the same normalised address the delete uses, or "TeamLA@..."
       // slips past the guard and deletes the master's own row.
@@ -375,10 +494,10 @@ function doPost(e) {
       case "approveSubmission": return json(withLock(() => approveSubmission(admin, d)));
       // Same pending-only rule as approveSubmission, so an already-approved
       // submission cannot be flipped to rejected after its group exists.
-      case "rejectSubmission": return json(withLock(() => { requireMaster(admin); const s = rows("Submissions").find((x) => x.id === d.id); if (!s) throw new Error("Submission not found"); if (String(s.status).toLowerCase() !== "pending") throw new Error("That submission has already been " + String(s.status) + "."); s.status = "rejected"; upsertRow("Submissions", "id", s); return { ok: true }; }));
+      case "rejectSubmission": return json(withLock(() => { requireMaster(admin); const s = byId_(rows("Submissions"), d.id); if (!s) throw new Error("Submission not found"); if (String(s.status).toLowerCase() !== "pending") throw new Error("That submission has already been " + String(s.status) + "."); setCell_("Submissions", "id", s.id, "status", "rejected"); return { ok: true }; }));
       case "subscribers": requireMaster(admin); return json({ ok: true, subscribers: rows("Subscribers").map((s) => ({ email: s.email, sports: s.sports, confirmed: s.confirmed, createdAt: s.createdAt })) });
-      case "sendDigestNow": requireMaster(admin); return json(sendDailyDigest(true));
-      case "setLastUpdated": requireMaster(admin); setMeta("lastUpdated", d.date || todayISO()); return json({ ok: true });
+      case "sendDigestNow": requireMaster(admin); return json(sendDailyDigest());
+      case "setLastUpdated": requireMaster(admin); setMeta("lastUpdated", DATE_RE.test(String(d.date)) ? String(d.date) : todayISO()); return json({ ok: true });
       // Sign-in codes are never affected by this; only the master can flip it.
       case "setEmailsSending": return json(withLock(() => { requireMaster(admin); setMeta("emailsSending", d.on ? "1" : ""); return { ok: true, emailsPaused: emailsPaused() }; }));
       default: return json({ ok: false, error: "Unknown action" });
@@ -391,7 +510,8 @@ function doPost(e) {
 /* ------------------------------------------------------------------ auth */
 function requestCode(email) {
   email = String(email || "").trim().toLowerCase();
-  const SAME = { ok: true, message: "If that address is an admin, a sign-in code is on its way." };
+  const SAME = { ok: true, message: "If that address is an admin, a sign-in code is on its way. A new code can be requested every two minutes." };
+  if (!validEmail(email) || email.length > 254) return SAME;
   // Throttle before looking the address up, so an admin address and a stranger's
   // behave identically — otherwise a second rapid call reveals which is which.
   try {
@@ -412,31 +532,49 @@ function requestCode(email) {
   // code — and the address is public, so anyone could trigger that. Brute
   // force is bounded by the request throttle above instead.
   upsertRow("Auth", "email", Object.assign(existing, { code, codeExpires: expires, attempts: 0 }));
-  sendMail_("auth", {
-    to: email,
-    subject: `${code} is your ${SITE_NAME} sign-in code`,
-    htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">Your sign-in code for the <b>${SITE_NAME}</b> admin center:</p>
-      <p style="font:700 32px/1 Inter,system-ui,sans-serif;letter-spacing:6px">${code}</p>
-      <p style="font-family:Inter,system-ui,sans-serif;color:#555">It expires in ${CODE_TTL_MIN} minutes. If you didn't request it, you can ignore this email.</p>`
-  });
-  return { ok: true, message: "If that address is an admin, a sign-in code is on its way." };
+  try {
+    sendMail_("auth", {
+      to: email,
+      subject: `${code} is your ${SITE_NAME} sign-in code`,
+      htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">Your sign-in code for the <b>${SITE_NAME}</b> admin center:</p>
+        <p style="font:700 32px/1 Inter,system-ui,sans-serif;letter-spacing:6px">${code}</p>
+        <p style="font-family:Inter,system-ui,sans-serif;color:#555">It expires in ${CODE_TTL_MIN} minutes. If you didn't request it, you can ignore this email.</p>`
+    });
+  } catch (err) {
+    // Say so, in words an admin can act on, instead of letting them wait for a
+    // code that was never sent.
+    Logger.log("sign-in code not sent -> " + email + " :: " + err);
+    throw new Error("We couldn't send a sign-in code just now. Please try again in a few minutes.");
+  }
+  return SAME;
 }
 function verifyCode(email, code) {
   email = String(email || "").trim().toLowerCase();
   throttle("verify:" + email, 12, 600);
-  const rec = rows("Auth").find((a) => a.email === email);
-  if (!rec || !rec.code) throw new Error("Request a new code first.");
-  if (new Date(rec.codeExpires) < new Date()) throw new Error("That code has expired. Request a new one.");
-  if (Number(rec.attempts) >= MAX_CODE_ATTEMPTS) throw new Error("Too many attempts. Request a new code.");
+  /* One answer for every way this can fail. Separate messages for "no code
+     requested", "expired" and "wrong" told a stranger which addresses belong
+     to admins, because only an admin's address ever has a code on file. */
+  const FAIL = "That code didn't work. Check it and try again, or request a new one.";
+  const rec = rows("Auth").find((a) => String(a.email).toLowerCase() === email);
+  if (!rec || !rec.code) throw new Error(FAIL);
+  if (new Date(rec.codeExpires) < new Date()) throw new Error(FAIL);
+  if (Number(rec.attempts) >= MAX_CODE_ATTEMPTS) throw new Error(FAIL);
   if (String(rec.code) !== String(code || "").trim()) {
-    rec.attempts = Number(rec.attempts || 0) + 1; upsertRow("Auth", "email", rec);
-    throw new Error("Incorrect code.");
+    setCell_("Auth", "email", rec.email, "attempts", Number(rec.attempts || 0) + 1);
+    throw new Error(FAIL);
   }
   const admin = rows("Admins").find((a) => String(a.email).toLowerCase() === email);
-  if (!admin) throw new Error("This address is no longer an admin.");
+  if (!admin) throw new Error(FAIL);
   const token = Utilities.getUuid() + Utilities.getUuid().replace(/-/g, "");
   upsertRow("Auth", "email", Object.assign(rec, { code: "", attempts: 0, token, tokenExpires: new Date(Date.now() + TOKEN_TTL_DAYS * 86400000).toISOString() }));
   return { ok: true, token, admin: publicAdmin(admin) };
+}
+// Open to anyone, so the lookup happens outside the lock: only a real token
+// ever takes it, and a flood of made-up ones cannot queue up behind saves.
+function logout(token) {
+  const rec = token && typeof token === "string" ? rows("Auth").find((a) => a.token && a.token === token) : null;
+  if (rec) withLock(() => { setCell_("Auth", "email", rec.email, "token", ""); setCell_("Auth", "email", rec.email, "tokenExpires", ""); });
+  return { ok: true };
 }
 function auth(token) {
   if (!token) throw new Error("Sign in required");
@@ -490,132 +628,256 @@ function sanitizeGroup(d) {
   // stored value should be a real URL in the first place.
   if (o.logoUrl !== undefined) o.logoUrl = cleanUrl(o.logoUrl);
   if (o.email !== undefined) o.email = validEmail(o.email) ? String(o.email).trim() : "";
-  ["name", "short", "programType", "times", "socialHandle"].forEach((k) => { if (o[k] !== undefined) o[k] = oneLine(o[k], 160); });
+  ["name", "short", "programType", "times", "socialHandle", "level"].forEach((k) => { if (o[k] !== undefined) o[k] = oneLine(o[k], 160).trim(); });
   ["description", "description_es"].forEach((k) => { if (o[k] !== undefined) o[k] = String(o[k]).slice(0, 1200); });
+  // Values from a fixed list are checked against it. One that is not on the
+  // list is dropped, so what is already stored stands, rather than saving
+  // text the public page would have to print.
+  [["sport", SPORT_IDS], ["ages", AGE_GROUPS], ["category", ["permitted", "community"]], ["permitStatus", ["permitted", "none", "unknown"]]]
+    .forEach(([k, allowed]) => { if (o[k] !== undefined && allowed.indexOf(String(o[k])) === -1) delete o[k]; });
+  if (o.badges !== undefined) o.badges = (Array.isArray(o.badges) ? o.badges : String(o.badges).split("|")).map((b) => oneLine(b, 40).trim()).filter(Boolean).slice(0, 8);
+  if (o.days !== undefined) o.days = (Array.isArray(o.days) ? o.days : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6);
   // headcount drives the monthly maintenance amount, so keep it sane
   if (o.participants !== undefined) o.participants = Math.max(0, Math.min(2000, Math.round(Number(o.participants) || 0)));
   return o;
 }
 function saveGroup(admin, d) {
   const all = rows("Groups");
-  const existing = all.find((g) => g.id === d.id);
+  const existing = byId_(all, d.id);
   if (!existing) {
     requireMaster(admin);
     d = sanitizeGroup(d);
+    if (!d.name) throw new Error("Name is required");
     // reuse the rows we already read rather than pulling the sheet twice
-    const g = Object.assign({ status: "approved", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: freshGroupId(d.name, all), updatedAt: nowISO() });
+    const g = Object.assign({ status: "approved", sport: "other", ages: "Mixed", category: "community", permitStatus: "unknown", paidPermit: false, badges: ["COMMUNITY GROUP"], days: [] }, d, { id: freshGroupId(d.name, all), updatedAt: nowISO() });
     upsertRow("Groups", "id", g); touch(); return { ok: true, group: g };
   }
   requireGroup(admin, existing.id);
   const patch = sanitizeGroup(d);
   if (!isMaster(admin)) MASTER_ONLY_GROUP_FIELDS.forEach((k) => delete patch[k]);
+  if (patch.name !== undefined && !patch.name) throw new Error("Name is required");
   const g = Object.assign(existing, patch, { id: existing.id, updatedAt: nowISO() });
   upsertRow("Groups", "id", g); touch(); return { ok: true, group: g };
 }
+/* Removing a group removes what only makes sense with it. Its weekly blocks
+   and dated events go too, or they stay on the public schedule with no group
+   behind them. Its updates and work-log entries are history, so they stay but
+   are detached, and its id comes off every admin: a group's id is the slug of
+   its name, and a later group with the same name must not inherit the old
+   one's schedule, logged hours or admins. */
+function deleteGroup(admin, d) {
+  requireMaster(admin);
+  const id = String(d.id || "");
+  const removed = { schedule: 0, events: 0 };
+  if (!id || !deleteRowBy("Groups", "id", id)) return { ok: true, removed: removed };
+  removed.schedule = deleteRowsWhere_("Schedule", "groupId", id);
+  removed.events = deleteRowsWhere_("Events", "groupId", id);
+  ["Updates", "WorkLog"].forEach((name) => {
+    rows(name).filter((r) => String(r.groupId) === id).forEach((r) => setCell_(name, "id", r.id, "groupId", ""));
+  });
+  rows("Admins").filter((a) => a.groupIds.indexOf(id) !== -1).forEach((a) => {
+    setCell_("Admins", "email", a.email, "groupIds", a.groupIds.filter((x) => x !== id));
+  });
+  touch();
+  return { ok: true, removed: removed };
+}
+const GROUP_GONE = "That group is no longer in the directory. Reload the page and choose another.";
 function saveScheduleLike(sheetName, admin, d) {
-  const existing = d.id ? rows(sheetName).find((x) => x.id === d.id) : null;
+  const existing = d.id ? byId_(rows(sheetName), d.id) : null;
   if (existing) requireGroup(admin, existing.groupId);
   if (!d.groupId && !isMaster(admin)) throw new Error("Choose one of your groups");
   requireGroup(admin, d.groupId);
-  const g = d.groupId ? rows("Groups").find((x) => x.id === d.groupId) : null;
+  const g = d.groupId ? byId_(rows("Groups"), d.groupId) : null;
+  // a removed group can still be sitting in an open browser tab
+  if (d.groupId && !g) throw new Error(GROUP_GONE);
+  const sameGroup = !!existing && String(existing.groupId || "") === String(d.groupId || "");
+  const derived = g ? (g.permitStatus === "permitted" ? "permitted" : "community") : "maintenance";
+  const field = (k) => (d[k] !== undefined ? d[k] : (existing ? existing[k] : ""));
   const rec = Object.assign({}, existing || {}, d, {
-    id: (existing && existing.id) || uid(),
-    sport: d.sport || (g ? g.sport : "community"),
-    category: isMaster(admin) ? (d.category || (g ? (g.permitStatus === "permitted" ? "permitted" : "community") : "maintenance")) : (g.permitStatus === "permitted" ? "permitted" : "community"),
+    id: existing ? existing.id : uid(),
+    groupId: d.groupId || "",
+    // The admin form has no sport field. A row keeps the sport it has while it
+    // stays with the same group; a new row, or one moved to another group,
+    // follows the group.
+    sport: pick_(d.sport, SPORT_IDS) || (sameGroup && pick_(existing.sport, SPORT_IDS)) || (g && pick_(g.sport, SPORT_IDS)) || "community",
+    // Only the master chooses a category. A blank choice ("Auto") follows the
+    // group's permit status; a request that leaves it out keeps what is stored.
+    // A group admin's save follows the group's permit status too, except that
+    // "open" and "maintenance" — which only the master can have set — are left
+    // as they are, so fixing a title does not undo the master's choice.
+    category: isMaster(admin)
+      ? (pick_(d.category, CATEGORY_IDS) || (d.category === undefined && sameGroup && pick_(existing.category, CATEGORY_IDS)) || derived)
+      : ((sameGroup && pick_(existing.category, ["open", "maintenance"])) || derived),
+    start: cleanTime_(field("start")), end: cleanTime_(field("end")),
+    title: oneLine(field("title"), 160).trim(), type: oneLine(field("type"), 60).trim(), facility: oneLine(field("facility"), 60).trim(),
     updatedBy: admin.email, updatedAt: nowISO()
   });
-  if (sheetName === "Schedule" && (rec.day === "" || rec.day === undefined)) throw new Error("Day is required");
-  if (sheetName === "Events" && !rec.date) throw new Error("Date is required");
+  if (sheetName === "Schedule") {
+    const day = Number(rec.day);
+    if (rec.day === "" || rec.day === null || rec.day === undefined || !Number.isInteger(day) || day < 0 || day > 6) throw new Error("Day is required");
+    rec.day = day;
+    rec.notes = oneLine(rec.notes, 300);
+  } else {
+    // Dates and times are printed into the schedule and into emails, so only
+    // the real formats are accepted.
+    rec.date = String(rec.date || "").trim();
+    if (!rec.date) throw new Error("Date is required");
+    if (!DATE_RE.test(rec.date) || isNaN(Date.parse(rec.date + "T12:00:00Z"))) throw new Error("That date is not valid. Use the date picker.");
+    if (!rec.title) throw new Error("Title is required");
+    rec.note = oneLine(rec.note, 300);
+  }
   if (!rec.start || !rec.end) throw new Error("Start and end times are required");
+  if (rec.start >= rec.end) throw new Error("End time must be after the start time.");
   upsertRow(sheetName, "id", rec); touch();
   return { ok: true, item: rec };
 }
 function deleteScheduleLike(sheetName, admin, id) {
-  const existing = rows(sheetName).find((x) => x.id === id);
+  const existing = byId_(rows(sheetName), id);
   if (!existing) return { ok: true };
   requireGroup(admin, existing.groupId);
-  deleteRowBy(sheetName, "id", id); touch(); return { ok: true };
+  deleteRowBy(sheetName, "id", existing.id); touch(); return { ok: true };
 }
 function postUpdate(admin, d) {
-  if (!d.title) throw new Error("Title is required");
-  let sport = d.sport || "all", groupId = d.groupId || "";
+  const title = oneLine(d.title, 160).trim();
+  if (!title) throw new Error("Title is required");
+  let sport = d.sport === "all" ? "all" : (pick_(d.sport, SPORT_IDS) || "all"), groupId = d.groupId || "";
+  const g = groupId ? byId_(rows("Groups"), groupId) : null;
+  if (groupId && !g) throw new Error(GROUP_GONE);
   if (!isMaster(admin)) {
     if (!groupId) throw new Error("Choose one of your groups");
     requireGroup(admin, groupId);
-    const g = rows("Groups").find((x) => x.id === groupId); sport = g ? g.sport : sport;
+    sport = pick_(g.sport, SPORT_IDS) || "other";
   }
-  const prev = d.id ? rows("Updates").find((x) => x.id === d.id) : null;
+  const prev = d.id ? byId_(rows("Updates"), d.id) : null;
   // Editing an existing update requires rights over the record as it stands,
   // not just over the group the caller is submitting.
   if (prev && !isMaster(admin) && !canEditGroup(admin, prev.groupId) && prev.author !== admin.email) {
     throw new Error("You can only edit your own group's updates");
   }
-  const u = { id: (prev && prev.id) || uid(), createdAt: prev ? prev.createdAt : nowISO(), author: d.author || admin.name || admin.email, sport, groupId, title: d.title, body: d.body || "", title_es: d.title_es || "", body_es: d.body_es || "", sentAt: prev ? prev.sentAt : "" };
+  // The byline is whoever is signed in. Only the master may put another name
+  // on a post, and editing a post keeps the byline it was published under.
+  const author = prev ? prev.author : ((isMaster(admin) && oneLine(d.author, 80).trim()) || admin.name || admin.email);
+  const u = { id: prev ? prev.id : uid(), createdAt: prev ? prev.createdAt : nowISO(), author, sport, groupId, title, body: String(d.body || "").slice(0, 4000), title_es: oneLine(d.title_es, 160).trim(), body_es: String(d.body_es || "").slice(0, 4000), sentAt: prev ? prev.sentAt : "" };
   upsertRow("Updates", "id", u); touch(); return { ok: true, update: u };
 }
 function deleteUpdate(admin, id) {
-  const u = rows("Updates").find((x) => x.id === id);
+  const u = byId_(rows("Updates"), id);
   if (!u) return { ok: true };
   if (!isMaster(admin) && !canEditGroup(admin, u.groupId) && u.author !== admin.email) throw new Error("Not your update");
-  deleteRowBy("Updates", "id", id); touch(); return { ok: true };
+  deleteRowBy("Updates", "id", u.id); touch(); return { ok: true };
+}
+// A blank stays blank; anything else becomes a number that is never negative.
+function nonNegative_(v) {
+  if (v === "" || v === null || v === undefined) return "";
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 function addWorkLog(admin, d) {
-  let groupId = d.groupId || "", organization = d.organization || "";
+  let groupId = d.groupId || "", organization = oneLine(d.organization, 120).trim();
+  const g = groupId ? byId_(rows("Groups"), groupId) : null;
+  if (groupId && !g) throw new Error(GROUP_GONE);
   if (!isMaster(admin)) {
     if (!groupId) throw new Error("Choose one of your groups");
     requireGroup(admin, groupId);
-    const g = rows("Groups").find((x) => x.id === groupId); organization = g ? g.name : organization;
-  }
-  const prevW = d.id ? rows("WorkLog").find((x) => x.id === d.id) : null;
+    organization = g.name;
+  } else if (g && !organization) organization = g.name;
+  const prevW = d.id ? byId_(rows("WorkLog"), d.id) : null;
   if (prevW && !isMaster(admin) && !canEditGroup(admin, prevW.groupId)) throw new Error("Not your entry");
-  const dw = Object.assign({}, d);
-  // only a master may set or clear "verified"; otherwise keep what was there
-  if (!isMaster(admin)) delete dw.verified;
-  const w = Object.assign({ verified: false }, prevW || {}, dw, { id: (prevW && prevW.id) || uid(), groupId, organization, addedBy: admin.email, createdAt: nowISO() });
-  if (!w.date || !w.activity) throw new Error("Date and activity are required");
+  const w = Object.assign({ verified: false }, prevW || {}, {
+    id: prevW ? prevW.id : uid(), groupId, organization,
+    date: String(d.date || "").trim(), activity: String(d.activity || "").trim().slice(0, 600),
+    area: oneLine(d.area, 80), hours: nonNegative_(d.hours), volunteers: nonNegative_(d.volunteers),
+    materials: oneLine(d.materials, 300), value: nonNegative_(d.value),
+    // who first logged it, and when, are part of the record and survive edits
+    addedBy: prevW ? prevW.addedBy : admin.email, createdAt: prevW ? prevW.createdAt : nowISO()
+  });
+  if (!DATE_RE.test(w.date) || !w.activity) throw new Error("Date and activity are required");
+  if (isMaster(admin)) {
+    if (d.verified !== undefined) w.verified = !!d.verified;
+  } else if (prevW && prevW.verified) {
+    // "Verified" vouches for the figures as they stood. If a group admin then
+    // changes them, the entry goes back to pending for the master to look at.
+    const changed = ["groupId", "date", "activity", "area", "hours", "volunteers", "materials", "value"].some((k) => String(prevW[k]) !== String(w[k]));
+    if (changed) w.verified = false;
+  }
   upsertRow("WorkLog", "id", w); touch(); return { ok: true, entry: w };
 }
 function deleteWorkLog(admin, id) {
-  const w = rows("WorkLog").find((x) => x.id === id);
+  const w = byId_(rows("WorkLog"), id);
   if (!w) return { ok: true };
   if (!isMaster(admin) && !canEditGroup(admin, w.groupId)) throw new Error("Not your entry");
-  deleteRowBy("WorkLog", "id", id); touch(); return { ok: true };
+  deleteRowBy("WorkLog", "id", w.id); touch(); return { ok: true };
 }
-function addAdmin(admin, d) {
+function saveProject(admin, d) {
+  requireMaster(admin);
+  const prev = d.id ? byId_(rows("Projects"), d.id) : null;
+  const p = Object.assign({}, prev || {}, d, { id: prev ? prev.id : uid(), updatedAt: nowISO() });
+  p.title = oneLine(p.title, 160).trim();
+  if (!p.title) throw new Error("Title is required");
+  p.status = pick_(p.status, PROJECT_STATUSES) || "PROPOSED";
+  p.goal = nonNegative_(p.goal); p.raised = nonNegative_(p.raised);
+  p.partners = (Array.isArray(p.partners) ? p.partners : String(p.partners || "").split("|")).map((x) => oneLine(x, 80).trim()).filter(Boolean);
+  upsertRow("Projects", "id", p); touch();
+  return { ok: true, project: p };
+}
+function addAdmin(admin, d, opts) {
   requireMaster(admin);
   const email = String(d.email || "").trim().toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Valid email required");
+  if (!validEmail(email) || email.length > 254) throw new Error("Valid email required");
+  const prev = rows("Admins").find((a) => String(a.email).toLowerCase() === email) || null;
+  const known = rows("Groups").map((g) => String(g.id));
+  let groupIds = (Array.isArray(d.groupIds) ? d.groupIds : []).map(String).filter((id) => known.indexOf(id) !== -1);
+  // Approving a second group for someone who already manages one adds it to
+  // their list. The Admins editor sends the whole list and replaces it.
+  const merge = !!(opts && opts.merge && prev);
+  if (merge) groupIds = prev.groupIds.concat(groupIds.filter((id) => prev.groupIds.indexOf(id) === -1));
   // The master role is bound to MASTER_EMAIL; nobody else can be granted it.
-  const rec = { email, role: email === MASTER_EMAIL ? "master" : "community", groupIds: d.groupIds || [], name: oneLine(d.name, 80), addedBy: admin.email, addedAt: nowISO() };
+  const rec = {
+    email, role: email === MASTER_EMAIL ? "master" : "community", groupIds,
+    name: merge && prev.name ? prev.name : oneLine(d.name, 80).trim(),
+    addedBy: prev ? prev.addedBy : admin.email, addedAt: prev ? prev.addedAt : nowISO()
+  };
   upsertRow("Admins", "email", rec);
-  if (d.notify !== false) {
-    sendMail_("adminInvite", { to: email, subject: `You're an admin on the ${SITE_NAME}`,
-      htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">You've been added as a <b>${rec.role} admin</b> on the ${SITE_NAME}.</p>
-        <p style="font-family:Inter,system-ui,sans-serif">Sign in with this email address at <a href="${SITE_URL}admin.html">${SITE_URL}admin.html</a>. A 6-digit code is emailed to you each time you sign in.</p>` });
-  }
-  return { ok: true, admin: rec };
+  const invited = d.notify !== false;
+  const emailed = invited && safeSend_("adminInvite", { to: email, subject: `You're an admin on the ${SITE_NAME}`,
+    htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">You've been added as a <b>${rec.role} admin</b> on the ${SITE_NAME}.</p>
+      <p style="font-family:Inter,system-ui,sans-serif">Sign in with this email address at <a href="${SITE_URL}admin.html">${SITE_URL}admin.html</a>. A 6-digit code is emailed to you each time you sign in.</p>` });
+  // "emailed" is false while outgoing email is paused, so the admin screen can say so.
+  return { ok: true, admin: rec, invited: invited, emailed: emailed };
 }
 function approveSubmission(admin, d) {
   requireMaster(admin);
-  const s = rows("Submissions").find((x) => x.id === d.id);
+  const s = byId_(rows("Submissions"), d.id);
   if (!s) throw new Error("Submission not found");
   // freshGroupId mints a new row every call, so approving twice would list the
   // group twice. The UI only offers Approve on a pending row; this guards the
   // endpoint itself.
   if (String(s.status).toLowerCase() !== "pending") throw new Error("That submission has already been " + String(s.status) + ".");
-  const sportId = d.sportId || slug(s.sport);
+  // Approving copies this row into the public directory. A formula in it would
+  // be copied as whatever it currently displays, which could be anything else
+  // in the spreadsheet, so such a row is never published.
+  if (rowHasFormula_("Submissions", "id", s.id)) throw new Error("This submission contains a spreadsheet formula, so it cannot be published. Reject it instead.");
+  const sportId = pick_(d.sportId, SPORT_IDS) || pick_(slug(s.sport), SPORT_IDS) || "other";
   const permitted = String(s.permit).toLowerCase() === "yes";
+  // The form invites "@handle or link". A link is kept as it is; a bare handle
+  // becomes an Instagram link, since that is what the field is labelled.
+  const rawSocial = String(s.social || "").trim();
+  const handle = /^@?[A-Za-z0-9._]{2,30}$/.test(rawSocial) ? rawSocial.replace(/^@/, "") : "";
   const g = {
     id: freshGroupId(s.groupName), name: s.groupName, short: initials(s.groupName), sport: sportId,
     category: permitted ? "permitted" : "community", permitStatus: permitted ? "permitted" : (String(s.permit).toLowerCase() === "no" ? "none" : "unknown"), paidPermit: permitted,
-    badges: permitted ? ["PERMITTED ORGANIZATION"] : ["COMMUNITY GROUP"], programType: s.orgType, ages: s.ages || "Mixed", level: "Recreational",
-    days: parseDays(s.days), times: oneLine(s.times, 160), website: cleanUrl(s.website), social: cleanUrl(s.social), socialHandle: "", email: validEmail(s.email) ? s.email : "",
-    description: s.description, description_es: "", logoUrl: "", status: "approved", example: false, updatedAt: nowISO()
+    badges: permitted ? ["PERMITTED ORGANIZATION"] : ["COMMUNITY GROUP"], programType: oneLine(s.orgType, 160), ages: pick_(s.ages, AGE_GROUPS) || "Mixed", level: "Recreational",
+    days: parseDays(s.days), times: oneLine(s.times, 160), website: cleanUrl(s.website),
+    social: cleanUrl(rawSocial) || (handle ? "https://instagram.com/" + handle : ""), socialHandle: handle ? "@" + handle : "",
+    email: validEmail(s.email) ? String(s.email).trim() : "",
+    description: String(s.description || "").slice(0, 1200), description_es: "", logoUrl: "", status: "approved", example: false, updatedAt: nowISO()
   };
   upsertRow("Groups", "id", g);
-  s.status = "approved"; upsertRow("Submissions", "id", s);
-  if (d.makeAdmin && s.email) addAdmin(admin, { email: s.email, role: "community", groupIds: [g.id], name: s.contact });
-  touch(); return { ok: true, group: g };
+  setCell_("Submissions", "id", s.id, "status", "approved");
+  const made = d.makeAdmin && validEmail(s.email) ? addAdmin(admin, { email: s.email, groupIds: [g.id], name: s.contact }, { merge: true }) : null;
+  touch();
+  // pass on whether the new admin's invitation really went out
+  return { ok: true, group: g, invited: !!(made && made.invited), emailed: !!(made && made.emailed) };
 }
 
 /* -------------------------------------------------- public: contributions */
@@ -653,7 +915,7 @@ function createCheckout(d) {
   // contributions for the rest of the hour. A tighter per-minute cap underneath
   // it means a burst costs everyone a minute, not the best part of an hour.
   throttleGlobal("createCheckout", 120);
-  throttle("cc:min:" + Math.floor(Date.now() / 60000), 10, 60);
+  throttle("cc:min", 10, 60);
   try {
     return createCheckout_(d);
   } catch (err) {
@@ -722,91 +984,176 @@ function createCheckout_(d) {
 
 /* ---------------------------------------------------- public: submissions */
 function submitGroup(f) {
-  if (!f.groupName || !validEmail(f.email)) throw new Error("Group name and a valid email are required");
-  throttle("sg:" + String(f.email).toLowerCase(), 3, 3600);
+  // same two signals the page checks; a scripted POST skips the page
+  if (looksAutomated_(f)) return { ok: true };
+  const email = String(f.email || "").trim().toLowerCase();
+  const groupName = oneLine(f.groupName, 120).trim();
+  if (!groupName || !validEmail(email) || email.length > 254) throw new Error("Group name and a valid email are required");
+  throttle("sg:" + email, 3, 3600);
   throttleGlobal("submitGroup", 40);
-  // the id is ours, never the caller's: a client-supplied id lands in the
-  // admin panel's markup and is a stored-XSS vector
-  const s = Object.assign({}, f, { id: uid(), createdAt: nowISO(), status: "pending" });
-  Object.keys(s).forEach((k) => { if (SCHEMA.Submissions.indexOf(k) === -1) delete s[k]; else if (typeof s[k] === "string") s[k] = s[k].slice(0, 1200); });
-  s.website = cleanUrl(s.website); s.groupName = oneLine(s.groupName, 120);
+  const line = (k, max) => oneLine(f[k], max).trim();
+  const size = Math.max(0, Math.min(2000, Math.round(Number(f.participants) || 0)));
+  // Every field is built here from text of a known length. The id is ours,
+  // never the caller's: a client-supplied id lands in the admin panel's markup.
+  const s = {
+    id: uid(), createdAt: nowISO(), status: "pending", groupName: groupName, email: email,
+    sport: line("sport", 60), orgType: line("orgType", 60), contact: line("contact", 120), phone: line("phone", 40),
+    website: cleanUrl(f.website), social: line("social", 200), days: line("days", 120), times: line("times", 160),
+    participants: size || "", ages: pick_(f.ages, AGE_GROUPS) || "Mixed",
+    description: String(f.description || "").slice(0, 1200),
+    permit: /^(yes|no)$/i.test(String(f.permit)) ? String(f.permit) : ""
+  };
   appendRow("Submissions", s);
-  sendMail_("submission", { to: MASTER_EMAIL, subject: `[Hjelte Hub] New group submission: ${oneLine(f.groupName, 80)}`,
+  safeSend_("submission", { to: MASTER_EMAIL, subject: `[Hjelte Hub] New group submission: ${oneLine(groupName, 80)}`,
     htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">A new group asked to be listed. Review it in the admin center → Submissions.</p><pre>${escapeHtml(JSON.stringify(s, null, 2))}</pre>` });
   return { ok: true };
 }
 
 /* ------------------------------------------------------- subscriptions */
+function sendConfirmation_(s) {
+  const url = ScriptApp.getService().getUrl() + "?action=confirm&token=" + s.token;
+  return safeSend_("subscribeConfirm", { to: s.email, subject: `Confirm your ${SITE_NAME} updates`,
+    htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">Tap to confirm you'd like updates for <b>${escapeHtml(s.sports.join(", "))}</b> at Hjelte Sports Center:</p>
+      <p><a href="${url}" style="font-family:Inter,system-ui,sans-serif;background:#2E7D4F;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:600">Confirm subscription</a></p>
+      <p style="font-family:Inter,system-ui,sans-serif;color:#555">If you didn't sign up, ignore this email.</p>` });
+}
 function subscribe(b) {
   const email = String(b.email || "").trim().toLowerCase();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw new Error("Valid email required");
+  if (!validEmail(email) || email.length > 254) throw new Error("Valid email required");
   throttle("sub:" + email, 3, 3600);
   throttleGlobal("subscribe", 80);
   // Only ids the site actually offers are stored — this value is echoed back
   // into the admin UI and into emails.
-  const ALLOWED = ["all", "baseball", "softball", "cricket", "soccer", "disc", "fitness", "youth", "community", "other"];
+  const ALLOWED = ["all"].concat(SPORT_IDS);
   let sports = (Array.isArray(b.sports) ? b.sports : []).map((x) => String(x).trim().toLowerCase()).filter((x) => ALLOWED.indexOf(x) !== -1);
   if (!sports.length || sports.indexOf("all") !== -1) sports = ["all"];
-  const existing = rows("Subscribers").find((s) => s.email === email);
-  const rec = Object.assign({ email, createdAt: nowISO(), confirmed: false, token: Utilities.getUuid() }, existing || {}, { sports });
-  upsertRow("Subscribers", "email", rec);
-  if (!rec.confirmed) {
-    const url = ScriptApp.getService().getUrl() + "?action=confirm&token=" + rec.token;
-    sendMail_("subscribeConfirm", { to: email, subject: `Confirm your ${SITE_NAME} updates`,
-      htmlBody: `<p style="font-family:Inter,system-ui,sans-serif">Tap to confirm you'd like updates for <b>${sports.join(", ")}</b> at Hjelte Sports Center:</p>
-        <p><a href="${url}" style="font-family:Inter,system-ui,sans-serif;background:#2E7D4F;color:#fff;padding:12px 18px;border-radius:999px;text-decoration:none;font-weight:600">Confirm subscription</a></p>
-        <p style="font-family:Inter,system-ui,sans-serif;color:#555">If you didn't sign up, ignore this email.</p>` });
-    return { ok: true, message: "Check your inbox to confirm your subscription." };
+  const existing = rows("Subscribers").find((s) => String(s.email).toLowerCase() === email);
+  const rec = Object.assign({ email, createdAt: nowISO(), confirmed: false, token: Utilities.getUuid(), confirmedAt: "", lastSentAt: "" }, existing || {}, { sports });
+  if (rec.confirmed) {
+    upsertRow("Subscribers", "email", rec);
+    return { ok: true, emailed: false, message: "Your sports preferences were updated." };
   }
-  return { ok: true, message: "Your sports preferences were updated." };
+  /* Until someone confirms, lastSentAt records that their confirmation link
+     went out. Blank means one is still owed — which is what happens to
+     everyone who signs up while outgoing email is paused — and the daily run
+     sends those first once email is back on. The reply says which it was, so
+     nobody is told to check an inbox that will stay empty. */
+  const emailed = sendConfirmation_(rec);
+  if (emailed) rec.lastSentAt = nowISO();
+  upsertRow("Subscribers", "email", rec);
+  return emailed
+    ? { ok: true, emailed: true, message: "Check your inbox to confirm your subscription." }
+    : { ok: true, emailed: false, message: "You're signed up. We'll email your confirmation link as soon as email updates are running." };
 }
 function confirmSubscriber(token) {
-  const s = rows("Subscribers").find((x) => x.token === token);
+  const s = token ? rows("Subscribers").find((x) => x.token === token) : null;
   if (!s) return page("Link not found", "This confirmation link is no longer valid. You can subscribe again on the website.");
-  s.confirmed = true; s.confirmedAt = nowISO(); upsertRow("Subscribers", "email", s);
-  return page("You're subscribed", `You'll receive ${SITE_NAME} updates for: ${s.sports.join(", ")}. Each email includes an unsubscribe link.`);
+  if (!s.confirmed) {
+    setCell_("Subscribers", "email", s.email, "confirmed", true);
+    setCell_("Subscribers", "email", s.email, "confirmedAt", nowISO());
+  }
+  return page("You're subscribed", `You'll receive ${SITE_NAME} updates for: ${escapeHtml(s.sports.join(", "))}. Each email includes an unsubscribe link.`);
 }
 function unsubscribe(token) {
-  const s = rows("Subscribers").find((x) => x.token === token);
+  const s = token ? rows("Subscribers").find((x) => x.token === token) : null;
   if (s) deleteRowBy("Subscribers", "email", s.email);
   return page("Unsubscribed", "You won't receive further update emails from the community hub.");
 }
 
-/* --------------------------------------------------------------- digest */
-function sendDailyDigest(force) {
-  // Stop before any bookkeeping. The loop below stamps lastSentAt and sentAt
-  // as it goes, so running it while paused would mark updates as delivered
-  // and quietly drop them from the first digest after email resumes.
-  if (emailsPaused()) { Logger.log("Daily digest skipped — outgoing email is paused."); return { ok: true, sent: 0, skipped: 0, paused: true }; }
-  const since = new Date(Date.now() - 26 * 3600000); // slight overlap so nothing is missed
-  const updates = rows("Updates").filter((u) => new Date(u.createdAt) > since);
-  const today = todayISO(), weekOut = Utilities.formatDate(new Date(Date.now() + 7 * 86400000), Session.getScriptTimeZone(), "yyyy-MM-dd");
-  const events = rows("Events").filter((e) => e.date >= today && e.date <= weekOut);
+/* --------------------------------------------------------------- digest
+   Each subscriber is sent what is new to THEM: updates posted since their
+   last email, and events that have been added, changed, or have come inside
+   the next seven days since then. Their own lastSentAt is the bookmark, so
+
+     • nothing is emailed twice — not by pressing "Send digest now" and then
+       letting the morning run fire, and not when a run stops half way;
+     • an update posted while email was paused still goes out when email
+       resumes, as long as it is under DIGEST_MAX_AGE_DAYS old;
+     • a week-ahead event is announced once, not again every morning.
+
+   One address failing does not stop the rest, and the run reports what it
+   did. Only single cells are written, so someone who unsubscribes while a run
+   is under way is not written back in.                                    */
+/* Before the pause switch existed every sign-up was emailed its confirmation
+   link on the spot, and nothing recorded that. Only people who signed up from
+   this day on can be owed one; older unconfirmed rows already had theirs. */
+const CONFIRMATIONS_OWED_SINCE = "2026-09-20T00:00:00.000Z";
+function sendDailyDigest() {
+  // Stop before any bookkeeping, so a paused run leaves every bookmark alone.
+  if (emailsPaused()) { Logger.log("Daily digest skipped — outgoing email is paused."); return { ok: true, sent: 0, skipped: 0, failed: 0, confirmations: 0, paused: true }; }
+  // One run at a time. "Send digest now" pressed as the morning run fires
+  // would otherwise have both read the same bookmarks and both send.
+  const cache = CacheService.getScriptCache();
+  if (cache.get("digest:running")) return { ok: true, sent: 0, skipped: 0, failed: 0, confirmations: 0, busy: true };
+  cache.put("digest:running", "1", 900);
+  try { return runDigest_(); } finally { cache.remove("digest:running"); }
+}
+function runDigest_() {
+  const startedMs = Date.now(), startedISO = new Date(startedMs).toISOString();
+  const tz = Session.getScriptTimeZone();
+  const dayOf = (ms) => Utilities.formatDate(new Date(ms), tz, "yyyy-MM-dd");
+  const floorMs = startedMs - DIGEST_MAX_AGE_DAYS * 86400000;
+  const today = dayOf(startedMs), weekOut = dayOf(startedMs + 7 * 86400000);
+  const when = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) ? t : 0; };
+  // Up to the moment this run began and no later: something posted while the
+  // run is reading belongs to the next one, where the bookmark will find it.
+  const updates = rows("Updates").filter((u) => when(u.createdAt) > floorMs && when(u.createdAt) <= startedMs);
+  const events = rows("Events").filter((e) => DATE_RE.test(String(e.date)) && e.date >= today && e.date <= weekOut)
+    .sort((a, b) => String(a.date + a.start).localeCompare(String(b.date + b.start)));
   const groups = rows("Groups");
-  const subs = rows("Subscribers").filter((s) => s.confirmed);
+  const byline = bylineFor_(rows("Admins"));
   const base = ScriptApp.getService().getUrl();
-  let sent = 0, skipped = 0;
-  for (const s of subs) {
-    if (MailApp.getRemainingDailyQuota() < 5) break;
+  // the same reserve sendMail_ keeps for sign-in codes
+  const quotaOk = () => MailApp.getRemainingDailyQuota() > MAIL_RESERVE_FOR_SIGN_IN;
+  // A bookmark that cannot be written (the sheet busy for 20 seconds) must not
+  // stop the run for everyone after it; it is logged and the run carries on.
+  const stamp = (name, keyField, keyValue, field, value) => {
+    try { return withLock(() => setCell_(name, keyField, keyValue, field, value)); }
+    catch (err) { Logger.log("digest bookmark not written (" + name + " " + keyValue + "): " + err); return false; }
+  };
+  let sent = 0, skipped = 0, failed = 0, confirmations = 0, stoppedForQuota = false;
+
+  // 1. confirmation links owed to people who signed up while email was paused
+  for (const s of rows("Subscribers")) {
+    if (s.confirmed || s.lastSentAt || String(s.createdAt) < CONFIRMATIONS_OWED_SINCE) continue;
+    if (!quotaOk()) { stoppedForQuota = true; break; }
+    if (sendConfirmation_(s)) { stamp("Subscribers", "email", s.email, "lastSentAt", startedISO); confirmations++; } else failed++;
+  }
+
+  // 2. the digest itself
+  for (const s of rows("Subscribers")) {
+    if (!s.confirmed) continue;
+    if (stoppedForQuota || !quotaOk()) { stoppedForQuota = true; break; }
+    const sinceMs = Math.max(floorMs, when(s.lastSentAt) || when(s.confirmedAt));
+    const horizonThen = dayOf(sinceMs + 7 * 86400000);
     const wants = (sport) => s.sports.indexOf("all") !== -1 || sport === "all" || s.sports.indexOf(sport) !== -1;
-    const myUpdates = updates.filter((u) => wants(u.sport));
+    const myUpdates = updates.filter((u) => wants(u.sport) && when(u.createdAt) > sinceMs);
     const myEvents = events.filter((e) => wants(e.sport));
-    if (!myUpdates.length && !myEvents.length) { skipped++; continue; }
+    const newsworthy = myEvents.some((e) => e.date > horizonThen || when(e.updatedAt) > sinceMs);
+    if (!myUpdates.length && !newsworthy) { skipped++; continue; }
     const li = (h) => `<li style="margin:0 0 10px">${h}</li>`;
-    const gname = (id) => { const g = groups.find((x) => x.id === id); return g ? g.name : ""; };
+    const gname = (id) => { const g = byId_(groups, id); return g ? g.name : ""; };
     const html = `<div style="font-family:Inter,system-ui,sans-serif;color:#1C1F22;max-width:600px">
       <p style="color:#2E7D4F;font-weight:700;letter-spacing:.1em;font-size:12px;margin:0">HJELTE SPORTS CENTER</p>
-      <h2 style="margin:4px 0 16px">Your ${s.sports.indexOf("all") !== -1 ? "" : s.sports.join(" · ") + " "}update</h2>
-      ${myUpdates.length ? `<h3 style="font-size:15px;margin:16px 0 8px">Latest updates</h3><ul style="padding-left:18px">${myUpdates.map((u) => li(`<b>${escapeHtml(u.title)}</b> <span style="color:#6B7076">· ${escapeHtml(u.author)}</span><br>${escapeHtml(u.body)}`)).join("")}</ul>` : ""}
-      ${myEvents.length ? `<h3 style="font-size:15px;margin:16px 0 8px">Coming up this week</h3><ul style="padding-left:18px">${myEvents.map((e) => li(`<b>${escapeHtml(e.title)}</b> · ${e.date} ${e.start}–${e.end}${e.groupId ? " · " + escapeHtml(gname(e.groupId)) : ""}${e.note ? "<br>" + escapeHtml(e.note) : ""}`)).join("")}</ul>` : ""}
+      <h2 style="margin:4px 0 16px">Your ${s.sports.indexOf("all") !== -1 ? "" : escapeHtml(s.sports.join(" · ")) + " "}update</h2>
+      ${myUpdates.length ? `<h3 style="font-size:15px;margin:16px 0 8px">Latest updates</h3><ul style="padding-left:18px">${myUpdates.map((u) => li(`<b>${escapeHtml(u.title)}</b> <span style="color:#6B7076">· ${escapeHtml(byline(u.author))}</span><br>${escapeHtml(u.body)}`)).join("")}</ul>` : ""}
+      ${myEvents.length ? `<h3 style="font-size:15px;margin:16px 0 8px">Coming up this week</h3><ul style="padding-left:18px">${myEvents.map((e) => li(`<b>${escapeHtml(e.title)}</b> · ${escapeHtml(e.date)} ${escapeHtml(e.start)}–${escapeHtml(e.end)}${e.groupId && gname(e.groupId) ? " · " + escapeHtml(gname(e.groupId)) : ""}${e.note ? "<br>" + escapeHtml(e.note) : ""}`)).join("")}</ul>` : ""}
       <p style="margin-top:20px"><a href="${SITE_URL}#schedule" style="background:#1C1F22;color:#fff;padding:10px 16px;border-radius:999px;text-decoration:none;font-weight:600">See the full schedule</a></p>
       <p style="color:#8A8F95;font-size:12px;margin-top:24px">Schedules are a community information resource and may change. Official permits and City of Los Angeles Department of Recreation and Parks requirements govern facility use.<br>
-      <a href="${base}?action=unsubscribe&token=${s.token}" style="color:#8A8F95">Unsubscribe</a></p></div>`;
-    sendMail_("digest", { to: s.email, subject: oneLine(`Hjelte update · ${myUpdates[0] ? myUpdates[0].title : myEvents[0].title}`, 120), htmlBody: html });
-    s.lastSentAt = nowISO(); upsertRow("Subscribers", "email", s); sent++;
+      <a href="${base}?action=unsubscribe&token=${encodeURIComponent(s.token)}" style="color:#8A8F95">Unsubscribe</a></p></div>`;
+    const lead = myUpdates[0] || myEvents.find((e) => e.date > horizonThen || when(e.updatedAt) > sinceMs);
+    if (safeSend_("digest", { to: s.email, subject: oneLine(`Hjelte update · ${lead.title}`, 120), htmlBody: html })) {
+      // the bookmark is the moment this run began, so anything posted while it
+      // was sending is still new to this subscriber next time
+      stamp("Subscribers", "email", s.email, "lastSentAt", startedISO); sent++;
+    } else failed++;
   }
-  updates.forEach((u) => { if (!u.sentAt) { u.sentAt = nowISO(); upsertRow("Updates", "id", u); } });
-  return { ok: true, sent, skipped, quotaLeft: MailApp.getRemainingDailyQuota() };
+
+  // 3. "Emailed" on an update means a full run has carried it. A run that was
+  //    cut short leaves it queued; nobody is sent it twice either way.
+  if (!stoppedForQuota && !failed) updates.forEach((u) => { if (!u.sentAt) stamp("Updates", "id", u.id, "sentAt", startedISO); });
+  if (stoppedForQuota || failed) Logger.log("Daily digest incomplete — sent " + sent + ", failed " + failed + (stoppedForQuota ? ", stopped at the daily email limit" : ""));
+  return { ok: true, sent, skipped, failed, confirmations, stoppedForQuota, quotaLeft: MailApp.getRemainingDailyQuota() };
 }
 
 /* ---------------------------------------------------------------- utils */
@@ -852,6 +1199,33 @@ function repairFormats() {
   });
   setMeta("lastUpdated", todayISO());
   Logger.log("Formats repaired. lastUpdated = " + todayISO());
+}
+
+/* =====================================================================
+   auditFormulas() — run from the editor; it only reads. No data tab should
+   ever contain a formula: every value is written as plain text. Rows saved
+   before that was enforced could hold one that a visitor typed into a public
+   form, so this lists any formula cell it finds in the execution log.
+   ===================================================================== */
+function auditFormulas() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let found = 0;
+  Object.keys(SCHEMA).forEach(function (name) {
+    const sh = ss.getSheetByName(name);
+    if (!sh || sh.getLastRow() < 2) return;
+    const formulas = sh.getRange(2, 1, sh.getLastRow() - 1, SCHEMA[name].length).getFormulas();
+    formulas.forEach(function (row, r) {
+      row.forEach(function (cell, c) {
+        if (!cell) return;
+        found++;
+        Logger.log(name + "!" + String.fromCharCode(65 + c) + (r + 2) + " (" + SCHEMA[name][c] + "): " + String(cell).slice(0, 80));
+      });
+    });
+  });
+  Logger.log(found
+    ? found + " formula cell(s) found. Replace each with plain text, then clear the token column of the Auth tab so every admin signs in again."
+    : "No formulas found in any data tab.");
+  return found;
 }
 
 /* One-time: grants the "connect to an external service" permission that the
