@@ -68,10 +68,27 @@
   /* ---------------- API (Google Apps Script) ---------------- */
   const API = D.config.apiUrl || "";
   async function api(action, data, token, extra) {
-    const r = await fetch(API, { method: "POST", body: JSON.stringify(Object.assign({ action, data, token }, extra || {})) });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || "Request failed");
+    let j;
+    try {
+      const r = await fetch(API, { method: "POST", body: JSON.stringify(Object.assign({ action, data, token }, extra || {})) });
+      j = await r.json();
+    } catch (err) {
+      // Offline, or the service answered with an error page instead of JSON.
+      // Either way the visitor needs a sentence, not "Unexpected token '<'".
+      throw new Error(I18.t("We couldn't reach the hub just now. Please check your connection and try again."));
+    }
+    if (!j || !j.ok) throw new Error(I18.t((j && j.error) || "Something went wrong. Please try again."));
     return j;
+  }
+  /* One submission at a time. A second click while the first is still on its
+     way used to send the form twice. Returns a function that unlocks the form,
+     or null if it is already busy. */
+  function lockForm(form) {
+    if (form.dataset.busy) return null;
+    form.dataset.busy = "1";
+    const btn = form.querySelector('[type="submit"]');
+    if (btn) { btn.disabled = true; btn.setAttribute("aria-busy", "true"); }
+    return () => { delete form.dataset.busy; if (btn) { btn.disabled = false; btn.removeAttribute("aria-busy"); } };
   }
   async function loadRemote() {
     if (!API) return false;
@@ -256,24 +273,36 @@
         <a href="#groups" class="btn btn-primary" data-explore="${id}">Explore Groups</a>
         <a href="#schedule" class="btn btn-outline" data-sched-sport="${id}">See schedule</a>
       </div></div>`);
-    $$("[data-explore], [data-group]", modalBody).forEach((a) => a.addEventListener("click", () => { setGroupFilter("sport", id); closeModal(); }));
+    $$("[data-explore], [data-group]", modalBody).forEach((a) => a.addEventListener("click", () => { resetGroupFilters(); setGroupFilter("sport", id); closeModal(); }));
     $("[data-sched-sport]", modalBody).addEventListener("click", () => { setScheduleFilter("sport", id); closeModal(); });
   }
 
   /* ---------------- schedule engine ---------------- */
-  const today = new Date();
-  const todayISO = isoDate(today);
-
-  function occurrencesOn(date) {
-    const dow = date.getDay(), iso = isoDate(date);
-    const rec = D.schedule.filter((e) => Number(e.day) === dow).map((e) => ({ ...e, date: iso }));
-    const sp = D.specialEvents.filter((e) => e.date === iso).map((e) => ({ ...e, day: dow, special: true }));
-    return [...rec, ...sp].sort((a, b) => toMin(a.start) - toMin(b.start));
+  /* "Today" and "now" on the schedule are the park's, not the visitor's. A
+     block that runs 5–6 PM in Encino is on at 5 PM Los Angeles time wherever
+     the page is being read, so the day and the time of day are taken from the
+     facility's time zone, and looked up each time the schedule is drawn — a
+     tab left open past midnight should not keep highlighting yesterday. */
+  const HUB_TZ = "America/Los_Angeles";
+  const DOW = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  function hubNow() {
+    try {
+      const parts = new Intl.DateTimeFormat("en-US", { timeZone: HUB_TZ, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+      const p = {}; parts.forEach((x) => { p[x.type] = x.value; });
+      const dow = DOW.indexOf(p.weekday), min = (Number(p.hour) % 24) * 60 + Number(p.minute);
+      if (dow !== -1 && Number.isFinite(min)) return { dow, min };
+    } catch (e) { /* no time-zone data in this browser: fall back to its own clock */ }
+    const d = new Date();
+    return { dow: d.getDay(), min: d.getHours() * 60 + d.getMinutes() };
   }
+  let drawnDow = -1; // the weekday highlighted by the last draw
+
   function titleOf(e) { if (e.title) return e.title; const g = group(e.groupId); return g ? g.name : e.type; }
+  // weekly blocks call their free-text line "notes", dated events "note"
+  const noteOf = (e) => e.note || e.notes || "";
   function activityCard(e, opts = {}) {
     const g = group(e.groupId), f = facility(e.facility), s = sport(e.sport);
-    const nowMin = today.getHours() * 60 + today.getMinutes();
+    const nowMin = opts.nowMin;
     const isNow = opts.today && toMin(e.start) <= nowMin && nowMin < toMin(e.end);
     return `<article class="activity${isNow ? " is-now" : ""}" style="${sportStyle(e.sport)}">
       <div class="activity-time">${fmtTime(e.start)}<small>to ${fmtTime(e.end)}${isNow ? " · now" : ""}</small></div>
@@ -288,7 +317,7 @@
           ${g && e.title ? `<span>${icon("users")}${esc(g.name)}</span>` : ""}
           <span>${icon("pin")}${esc(f ? f.name : e.facility)}</span>
         </div>
-        ${e.note ? `<p class="activity-note">${esc(e.note)}</p>` : ""}
+        ${noteOf(e) ? `<p class="activity-note">${esc(noteOf(e))}</p>` : ""}
       </div></article>`;
   }
 
@@ -297,7 +326,15 @@
   const filtersForm = $("#scheduleFilters");
   function fillSelect(sel, opts) { opts.forEach(([v, l]) => { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.appendChild(o); }); }
   fillSelect(filtersForm.sport, D.sports.map((s) => [s.id, s.name]));
-  fillSelect(filtersForm.day, DAYS.map((d, i) => [String(i), d]));
+  // Day names are rebuilt on every render: built once, they stayed in whichever
+  // language the page happened to load in.
+  function fillDayFilter() {
+    const keep = filtersForm.day.value;
+    Array.from(filtersForm.day.options).slice(1).forEach((o) => o.remove());
+    fillSelect(filtersForm.day, DAYS.map((d, i) => [String(i), d]));
+    filtersForm.day.value = keep;
+  }
+  fillDayFilter();
   fillSelect(filtersForm.facility, D.facilities.map((f) => [f.id, f.name]));
   fillSelect(filtersForm.type, D.activityTypes.map((t) => [t, t]));
   function fillGroupFilter() {
@@ -349,11 +386,13 @@
     grid.style.gridTemplateColumns = `56px repeat(${days.length}, var(--wg-track, 1fr))`;
     grid.style.setProperty("--wg-days", days.length);
     const bodyH = (END - START) / 60 * HOUR_H;
-    let html = `<div class="wg-head"></div>` + days.map((d) => `<div class="wg-head${d === today.getDay() ? " is-today" : ""}">${DAYS_S[d]}${d === today.getDay() ? "<em>Today</em>" : ""}</div>`).join("");
+    const now = hubNow(), todayDow = now.dow;
+    drawnDow = todayDow;
+    let html = `<div class="wg-head"></div>` + days.map((d) => `<div class="wg-head${d === todayDow ? " is-today" : ""}">${DAYS_S[d]}${d === todayDow ? "<em>Today</em>" : ""}</div>`).join("");
     html += `<div class="wg-gutter" style="height:${bodyH}px">` + Array.from({ length: (END - START) / 60 + 1 }, (_, i) => `<span style="top:${i * HOUR_H}px">${fmtTime(`${String(6 + i).padStart(2, "0")}:00`)}</span>`).join("") + `</div>`;
     html += days.map((d) => {
       const evs = lanes(items.filter((e) => Number(e.day) === d));
-      return `<div class="wg-col${d === today.getDay() ? " is-today" : ""}" style="height:${bodyH}px;--hour-h:${HOUR_H}px">` + evs.map(({ e, lane, n }) => {
+      return `<div class="wg-col${d === todayDow ? " is-today" : ""}" style="height:${bodyH}px;--hour-h:${HOUR_H}px">` + evs.map(({ e, lane, n }) => {
         const sMin = Math.max(START, Math.min(END, toMin(e.start) || START));
         const eMin = Math.max(sMin + 15, Math.min(END, toMin(e.end) || END));
         const top = (sMin - START) / 60 * HOUR_H, h = Math.max(18, (eMin - sMin) / 60 * HOUR_H);
@@ -368,11 +407,16 @@
     list.innerHTML = days.map((d) => {
       const evs = items.filter((e) => Number(e.day) === d).sort((a, b) => toMin(a.start) - toMin(b.start));
       if (!evs.length) return "";
-      return `<details class="wl-day${d === today.getDay() ? " is-today" : ""}" ${d === today.getDay() || sched.day ? "open" : ""}>
+      return `<details class="wl-day${d === todayDow ? " is-today" : ""}" ${d === todayDow || sched.day ? "open" : ""}>
         <summary>${DAYS[d]}<small>${evs.length} ${evs.length === 1 ? "activity" : "activities"}</small></summary>
-        <div class="wl-items">${evs.map((e) => activityCard(e, { today: d === today.getDay() })).join("")}</div></details>`;
+        <div class="wl-items">${evs.map((e) => activityCard(e, { today: d === todayDow, nowMin: now.min })).join("")}</div></details>`;
     }).join("");
   }
+  // Coming back to a tab that was left open: if the day has changed at the
+  // park since the schedule was drawn, draw it again.
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && drawnDow !== -1 && hubNow().dow !== drawnDow) renderSchedule();
+  });
   function openEvent(e) {
     const g = group(e.groupId), f = facility(e.facility), s = sport(e.sport);
     openModal(`<div style="${sportStyle(e.sport)}">
@@ -383,12 +427,17 @@
         <div><dt class="fine-print" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Facility</dt><dd style="margin:0">${esc(f ? f.name : e.facility)}</dd></div>
         ${g ? `<div><dt class="fine-print" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Organization</dt><dd style="margin:0">${esc(g.name)}${g.example ? " <span class='tag tag-example'>Sample</span>" : ""}<br><small style="color:var(--muted)">${esc(g.programType)} · ${esc(g.ages)}</small></dd></div>` : ""}
         <div><dt class="fine-print" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Category</dt><dd style="margin:0;color:var(--muted);font-size:.9rem">${esc(D.categories[e.category]?.desc || "")}</dd></div>
+        ${noteOf(e) ? `<div><dt class="fine-print" style="text-transform:uppercase;letter-spacing:.1em;font-weight:700">Note</dt><dd style="margin:0">${esc(noteOf(e))}</dd></div>` : ""}
       </dl>
       <div class="modal-actions">
         ${g ? `<a href="#groups" class="btn btn-primary" data-group-open="${esc(g.id)}">View group</a>` : ""}
-        <a href="#connect" class="btn btn-outline" data-topic="Schedule update" data-msg="Schedule update for: ${esc(titleOf(e))} (${DAYS[e.day]} ${fmtRange(e.start, e.end)}, ${esc(f ? f.name : "")}).%0A%0AWhat changed:%0A">Report a change</a>
+        <a href="#connect" class="btn btn-outline" data-topic="Schedule update" data-msg="${esc(`Schedule update for: ${titleOf(e)} (${DAYS[e.day]} ${fmtRange(e.start, e.end)}, ${f ? f.name : ""}).\n\nWhat changed:\n`)}">Report a change</a>
       </div></div>`);
-    const go = $("[data-group-open]", modalBody); if (go) go.addEventListener("click", () => { $("#groupSearch").value = g.name; dir.q = g.name.toLowerCase(); renderGroups(); closeModal(); });
+    const go = $("[data-group-open]", modalBody); if (go) go.addEventListener("click", () => {
+      // any filter left on from earlier could hide the very group being opened
+      resetGroupFilters();
+      $("#groupSearch").value = g.name; dir.q = g.name.toLowerCase(); renderGroups(); closeModal();
+    });
     $("[data-topic]", modalBody).addEventListener("click", closeModal);
   }
   function renderLegend() {
@@ -413,6 +462,14 @@
     const row = $(`#groupFilters [data-filter="${key}"]`);
     $$(".chip", row).forEach((c) => { const on = c.dataset.value === val; c.classList.toggle("is-active", on); c.setAttribute("aria-pressed", String(on)); });
     dir[key] = val; renderGroups();
+  }
+  function resetGroupFilters() {
+    Object.keys(dir).forEach((k) => { dir[k] = ""; });
+    $("#groupSearch").value = "";
+    $$("#groupFilters .chip-row").forEach((row) => $$(".chip", row).forEach((c) => {
+      const on = (c.dataset.value || "") === "";
+      c.classList.toggle("is-active", on); c.setAttribute("aria-pressed", String(on));
+    }));
   }
   $("#groupSearch").addEventListener("input", (e) => { dir.q = e.target.value.trim().toLowerCase(); renderGroups(); });
   fillSelect($("#formSport"), D.sports.map((s) => [s.name, s.name]));
@@ -516,12 +573,14 @@
         }
       }
       if (API && form.id === "groupForm") {
+        const release = lockForm(form); if (!release) return;
         try {
           statusEl.textContent = I18.t("Sending…");
           const obj = {}; fd.forEach((v, k) => { if (!(v instanceof File)) obj[k] = v; });
           await api("submitGroup", obj);
           statusEl.textContent = I18.t("Your listing was sent for review. It appears once a hub admin approves it."); form.reset(); newCaptcha(); return;
         } catch (err) { statusEl.textContent = err.message; statusEl.classList.add("is-error"); return; }
+        finally { release(); }
       }
       if (D.config.formEndpoint) {
         try {
@@ -570,8 +629,12 @@
   // links that preset the contact topic (Report a Schedule Update, etc.)
   document.addEventListener("click", (e) => {
     const a = e.target.closest("[data-topic]"); if (!a) return;
-    const sel = $("#contactTopic"); const opt = Array.from(sel.options).find((o) => o.text === a.dataset.topic); if (opt) sel.value = opt.text;
-    if (a.dataset.msg) $("#contactForm textarea").value = decodeURIComponent(a.dataset.msg);
+    // Options carry their English name as the value, so this still finds the
+    // right one when the page is showing Spanish.
+    const sel = $("#contactTopic"); const opt = Array.from(sel.options).find((o) => o.value === a.dataset.topic); if (opt) sel.value = opt.value;
+    // The message is plain text in the attribute. It used to be run through
+    // decodeURIComponent, which throws on a title such as "100% shade".
+    if (a.dataset.msg) $("#contactForm textarea").value = a.dataset.msg;
   });
 
   /* ---------------- facility map ---------------- */
@@ -763,7 +826,7 @@
           <div><b>Volunteer:</b> ${esc(p.volunteer)}</div>
         </div>
         ${p.status === "COMPLETED" ? "" : `<p class="fund-line"><b>Funding needed:</b> TBD</p>`}
-        ${p.status === "COMPLETED" ? `<a href="#featured" class="btn btn-outline btn-sm">See the story</a>` : `<a href="#connect" class="btn btn-primary btn-sm" data-topic="Fund a project" data-msg="I'd like to support the project: ${esc(p.title)}.%0A%0AHow I can help (funds, materials, volunteer time, introductions):%0A">Support This Project</a>`}
+        ${p.status === "COMPLETED" ? `<a href="#featured" class="btn btn-outline btn-sm">See the story</a>` : `<a href="#connect" class="btn btn-primary btn-sm" data-topic="Fund a project" data-msg="${esc(`I'd like to support the project: ${p.title}.\n\nHow I can help (funds, materials, volunteer time, introductions):\n`)}">Support This Project</a>`}
       </article>`;
     }).join("") || `<p class="empty-note" style="grid-column:1/-1">No projects with this status yet.</p>`;
   }
@@ -778,7 +841,7 @@
   function renderUpdates() {
     const ups = [...(D.updates || [])].sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     const sportsIn = [...new Set(ups.map((u) => u.sport).filter((x) => x && x !== "all"))];
-    $("#updateFilters").innerHTML = `<button class="chip${updFilter === "all" ? " is-active" : ""}" data-value="all">All</button>` + sportsIn.map((id) => `<button class="chip${updFilter === id ? " is-active" : ""}" data-value="${id}"><i class="dot" style="background:${sport(id).color}"></i>${esc(sport(id).name)}</button>`).join("");
+    $("#updateFilters").innerHTML = `<button class="chip${updFilter === "all" ? " is-active" : ""}" data-value="all">All</button>` + sportsIn.map((id) => `<button class="chip${updFilter === id ? " is-active" : ""}" data-value="${esc(id)}"><i class="dot" style="background:${sport(id).color}"></i>${esc(sport(id).name)}</button>`).join("");
     $$("#updateFilters .chip").forEach((c) => { c.setAttribute("aria-pressed", String(c.dataset.value === updFilter)); c.addEventListener("click", () => { updFilter = c.dataset.value; renderUpdates(); }); });
     const list = ups.filter((u) => updFilter === "all" || u.sport === updFilter || u.sport === "all");
     $("#updateList").innerHTML = list.length ? list.map((u) => { const s = u.sport && u.sport !== "all" ? sport(u.sport) : null; const g = group(u.groupId);
@@ -805,8 +868,16 @@
     if (!f.email.checkValidity()) { st.textContent = I18.t("Please complete the required fields."); st.classList.add("is-error"); return; }
     if (!sports.length) { st.textContent = I18.t("Choose at least one sport or All sports."); st.classList.add("is-error"); return; }
     if (!API) { window.location.href = mailto(`Subscribe to Hjelte updates: ${sports.join(", ")}`, `Please add ${email} to updates for: ${sports.join(", ")}.`); st.textContent = I18.t("Email updates aren't switched on yet; check back soon."); return; }
-    try { st.textContent = I18.t("Sending…"); const r = await api("subscribe", null, null, { email, sports }); st.textContent = I18.t(r.message || "Check your inbox to confirm your subscription."); f.reset(); renderSubscribeSports(); }
-    catch (err) { st.textContent = err.message; st.classList.add("is-error"); }
+    const release = lockForm(f); if (!release) return;
+    try {
+      st.textContent = I18.t("Sending…");
+      const r = await api("subscribe", null, null, { email, sports });
+      // The service says which it was: a confirmation link on its way, or
+      // signed up with the link to follow once email updates are running.
+      st.textContent = I18.t(r.message || "You're signed up.");
+      f.reset(); renderSubscribeSports();
+    } catch (err) { st.textContent = err.message; st.classList.add("is-error"); }
+    finally { release(); }
   });
 
   /* ---------------- stewardship ---------------- */
@@ -814,7 +885,7 @@
     const all = D.worklog || [];
     // Headline totals count verified, non-sample entries only — published numbers
     // on a civic page should never include placeholder rows.
-    const w = all.filter((x) => !isSample(x));
+    const w = all.filter((x) => x.verified && !isSample(x));
     const hours = w.reduce((a, x) => a + Number(x.hours || 0), 0), vols = w.reduce((a, x) => a + Number(x.volunteers || 0), 0);
     $("#stewardStats").innerHTML = [[hours, "Volunteer hours"], [vols, "Volunteer shifts"], [w.length, "Work days"], ["TBD", "Materials & services"]].map(([v, l]) => `<li><strong>${v}</strong><span>${l}</span></li>`).join("");
     $("#worklogList").innerHTML = all.length ? [...all].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 8).map((x) => `<article class="work">
@@ -869,7 +940,8 @@
     $("#memberBenefits").innerHTML = M.benefits.map((b) => `<li>${esc(b)}</li>`).join("");
     const keepType = $("#memberType").value, keepInterest = $("#memberInterests").value;
     $("#memberType").innerHTML = `<option value="">${I18.t("Select…")}</option>` +
-      M.memberTypes.map((t) => `<option>${esc(t)}</option>`).join("");
+      // an explicit value, so Spanish labels still submit the name the backend knows
+      M.memberTypes.map((t) => `<option value="${esc(t)}">${esc(t)}</option>`).join("");
     $("#memberInterests").innerHTML = `<option value="">${I18.t("Select…")}</option>` +
       M.interests.map((i) => `<option value="${esc(i.id)}">${esc(i.label)}</option>`).join("");
     $("#memberType").value = keepType; $("#memberInterests").value = keepInterest;
@@ -1046,7 +1118,7 @@
     const part = (label, rec) => refToken(label) + (rec && rec.id ? "-" + refToken(rec.id).slice(0, 24) : "");
     payRef = `${part(projLabel, proj)}--for--${part(grpLabel, grp)}`.slice(0, 200);
     const note = $("#payMemo");
-    if (note) note.textContent = `${I18.t("Memo on your contribution:")} ${projLabel} · ${grpLabel}`;
+    if (note) note.textContent = `${I18.t("Memo on your contribution:")} ${proj ? projLabel : I18.t(GENERAL_PROJECT)} · ${grp ? grpLabel : I18.t(NO_GROUP)}`;
 
     // The monthly amount is the group's headcount, so it is spelled out here
     // rather than first appearing on Stripe's page.
@@ -1164,18 +1236,23 @@
         interests: [fd.get("interests")].filter(Boolean), notes: "",
         website2: fd.get("website2") || "", formTs: fd.get("formTs")
       };
-      const done = () => {
-        statusEl.textContent = I18.t("You're on the community list. Check your email for a confirmation.");
+      // "Check your email" only when the service says a message really went out.
+      const done = (emailed) => {
+        statusEl.textContent = I18.t(emailed
+          ? "You're on the community list. Check your email for a confirmation."
+          : "You're on the community list. Thank you for joining.");
         form.reset(); newMemberCaptcha(); syncMemberType(true);
         renderMembership();
       };
-      if (String(data.website2).trim() || Date.now() - Number(data.formTs || 0) < 3000) { done(); return; }
+      if (String(data.website2).trim() || Date.now() - Number(data.formTs || 0) < 3000) { done(false); return; }
       if (API) {
+        const release = lockForm(form); if (!release) return;
         try {
           statusEl.textContent = I18.t("Sending…");
-          await api("joinCommunity", data);
-          done(); return;
+          const r = await api("joinCommunity", data);
+          done(!!r.emailed); return;
         } catch (err) { statusEl.textContent = err.message; statusEl.classList.add("is-error"); return; }
+        finally { release(); }
       }
       window.location.href = mailto(`Hjelte community sign-up: ${data.name}`,
         [`Name: ${data.name}`, `Email: ${data.email}`, `Phone: ${data.phone}`,
@@ -1226,7 +1303,7 @@
   /* ---------------- init ---------------- */
   function renderAll() {
     DAYS = I18.days; DAYS_S = I18.daysShort;
-    fillGroupFilter();
+    fillDayFilter(); fillGroupFilter();
     renderSports(); renderSchedule(); renderLegend(); renderLastUpdated();
     renderGroups(); renderFeatured(); renderAreas(); renderProjects(); renderContribute(); renderConnect();
     renderUpdates(); renderSubscribeSports(); renderStewardship(); renderMembership();
@@ -1239,7 +1316,7 @@
   const DIAMOND_NUM = { A: "1", B: "2", C: "3", D: "4" };
   function normalizeDiamonds() {
     const fix = (v) => typeof v === "string"
-      ? v.replace(/\bDiamonds?\s+[A-D](\s*[–-]\s*[A-D])?\b/g, (m) => m.replace(/[A-D]/g, (c) => DIAMOND_NUM[c]))
+      ? v.replace(/\b(Diamonds?\s+)([A-D])(?:(\s*[–-]\s*)([A-D]))?\b/g, (m, word, a, dash, b) => word + DIAMOND_NUM[a] + (b ? dash + DIAMOND_NUM[b] : ""))
       : v;
     const pass = (rows, keys) => (rows || []).forEach((r) => keys.forEach((k) => { r[k] = fix(r[k]); }));
     pass(D.schedule, ["title", "notes"]);
