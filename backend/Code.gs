@@ -897,15 +897,24 @@ function checkoutPayload_(o) {
     p["line_items[0][price]"] = o.priceId;
     p["line_items[0][quantity]"] = String(o.quantity);
   } else {
-    p.submit_type = "donate";
+    // "Donate" on Stripe's button for a contribution, "Pay" for a sponsorship
+    p.submit_type = o.sponsor ? "pay" : "donate";
     p["line_items[0][quantity]"] = "1";
     p["line_items[0][price_data][currency]"] = "usd";
     p["line_items[0][price_data][unit_amount]"] = String(o.amountCents);
     p["line_items[0][price_data][product_data][name]"] = o.productName;
   }
+  /* Stripe keeps a session's metadata on the session. For a one-time payment
+     the same details are also put on the payment itself, with a readable
+     description, because the Payments list and its exports show the payment:
+     that is where a sponsor's name or a project has to be visible. */
+  const onPayment = o.mode !== "subscription";
+  if (onPayment && o.description) p["payment_intent_data[description]"] = String(o.description).slice(0, 480);
   Object.keys(o.metadata || {}).forEach(function (k) {
     const v = o.metadata[k];
-    if (v !== "" && v !== null && v !== undefined) p["metadata[" + k + "]"] = String(v).slice(0, 480);
+    if (v === "" || v === null || v === undefined) return;
+    p["metadata[" + k + "]"] = String(v).slice(0, 480);
+    if (onPayment) p["payment_intent_data[metadata][" + k + "]"] = String(v).slice(0, 480);
   });
   return p;
 }
@@ -934,6 +943,12 @@ function createCheckout_(d) {
   const mode = d.mode === "subscription" ? "subscription" : "payment";
   const grp = d.groupId ? rows("Groups").find((g) => String(g.id) === String(d.groupId)) : null;
   const proj = d.projectId ? rows("Projects").find((p) => String(p.id) === String(d.projectId)) : null;
+  // A sponsor pays through the same one-time flow. The name is whatever was
+  // typed into a public page, so it is cut to one short line; it goes to
+  // Stripe as a label on the payment and is never written to the sheet.
+  const sponsor = mode === "payment" && d.sponsor === true;
+  const sponsorName = sponsor ? String(d.sponsorName || "").replace(/[\x00-\x1f\x7f]+/g, " ").replace(/\s+/g, " ").trim().slice(0, 80) : "";
+  if (sponsor && sponsorName.length < 2) throw donorError_("Enter the business or organization name for the sponsorship.");
   const o = {
     mode: mode,
     // the caller's ref is a memo, so it is reduced to the characters Stripe
@@ -942,6 +957,7 @@ function createCheckout_(d) {
     metadata: {
       groupId: grp ? grp.id : "", groupName: grp ? grp.name : "Not for a group",
       projectId: proj ? proj.id : "", projectTitle: proj ? proj.title : "General maintenance",
+      kind: sponsor ? "sponsorship" : "contribution", sponsorName: sponsorName,
       source: "hjeltesportscenter.com"
     }
   };
@@ -962,7 +978,9 @@ function createCheckout_(d) {
     if (!(cents >= ONETIME_MIN_CENTS)) throw donorError_("The smallest contribution is $" + (ONETIME_MIN_CENTS / 100) + ".");
     if (cents > ONETIME_MAX_CENTS) throw donorError_("For more than $" + (ONETIME_MAX_CENTS / 100) + ", please get in touch so we can thank you properly.");
     o.amountCents = cents;
-    o.productName = "Hjelte Community Maintenance — one-time contribution";
+    o.productName = sponsor ? "Hjelte Community Sponsorship — one-time" : "Hjelte Community Maintenance — one-time contribution";
+    o.sponsor = sponsor;
+    o.description = (sponsor ? "Sponsorship — " + sponsorName : "Contribution") + " · " + o.metadata.projectTitle + (grp ? " · for " + grp.name : "");
   }
   const res = UrlFetchApp.fetch(STRIPE_CHECKOUT_URL, {
     method: "post",
