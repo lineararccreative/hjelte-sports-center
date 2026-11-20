@@ -21,12 +21,21 @@
   try { token = localStorage.getItem(TOKEN_KEY); } catch (e) { token = null; }
 
   /* ---------------- transport ---------------- */
-  async function api(action, payload) {
-    const r = await fetch(API, { method: "POST", body: JSON.stringify(Object.assign({ action, token }, payload || {})) });
-    const j = await r.json();
-    if (!j.ok) throw new Error(j.error || "Request failed");
+  /* Every request goes through here, signed-in or not. A dropped connection,
+     or an Apps Script error page arriving where JSON was expected, becomes one
+     plain sentence instead of "Unexpected token '<'". */
+  async function call(body) {
+    let j;
+    try {
+      const r = await fetch(API, { method: "POST", body: JSON.stringify(body) });
+      j = await r.json();
+    } catch (err) {
+      throw new Error("The hub did not answer. Check your connection and try again.");
+    }
+    if (!j || !j.ok) throw new Error((j && j.error) || "Request failed");
     return j;
   }
+  const api = (action, payload) => call(Object.assign({ action, token }, payload || {}));
   function toast(msg, isError) {
     const t = $("#toast"); t.textContent = msg; t.classList.toggle("is-error", !!isError); t.hidden = false;
     clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 3800);
@@ -40,28 +49,43 @@
     const email = e.target.email.value.trim(), st = $("#emailStatus");
     if (!e.target.email.checkValidity()) { st.textContent = "Enter a valid email."; st.classList.add("is-error"); return; }
     st.classList.remove("is-error"); st.textContent = "Sending…";
+    const btn = e.target.querySelector('[type="submit"]'); btn.disabled = true;
     try {
-      const r = await fetch(API, { method: "POST", body: JSON.stringify({ action: "requestCode", email }) }).then((x) => x.json());
+      // call() throws when the backend says the request failed, so the code
+      // box only appears when a code may really be on its way
+      const r = await call({ action: "requestCode", email });
       pendingEmail = email;
-      st.textContent = r.message || "Check your email for the code.";
-      $("#emailForm").hidden = true; $("#codeForm").hidden = false; $("#codeForm").code.focus();
+      st.textContent = "";
+      $("#codeStatus").classList.remove("is-error");
+      $("#codeStatus").textContent = r.message || "Check your email for the code.";
+      $("#emailForm").hidden = true; $("#codeForm").hidden = false; $("#codeForm").code.value = ""; $("#codeForm").code.focus();
     } catch (err) { st.textContent = err.message; st.classList.add("is-error"); }
+    finally { btn.disabled = false; }
   });
-  $("#resend").addEventListener("click", () => { $("#codeForm").hidden = true; $("#emailForm").hidden = false; $("#emailStatus").textContent = ""; });
+  $("#resend").addEventListener("click", () => {
+    $("#codeForm").hidden = true; $("#emailForm").hidden = false;
+    ["#emailStatus", "#codeStatus"].forEach((s) => { $(s).textContent = ""; $(s).classList.remove("is-error"); });
+  });
   $("#codeForm").addEventListener("submit", async (e) => {
     e.preventDefault();
     const st = $("#codeStatus"); st.classList.remove("is-error"); st.textContent = "Checking…";
+    const btn = e.target.querySelector('[type="submit"]'); btn.disabled = true;
     try {
-      const r = await fetch(API, { method: "POST", body: JSON.stringify({ action: "verifyCode", email: pendingEmail, code: e.target.code.value.trim() }) }).then((x) => x.json());
-      if (!r.ok) throw new Error(r.error);
+      const r = await call({ action: "verifyCode", email: pendingEmail, code: e.target.code.value.trim() });
       token = r.token; me = r.admin;
       try { localStorage.setItem(TOKEN_KEY, token); } catch (err) { /* private mode */ }
+      st.textContent = "";
       start();
     } catch (err) { st.textContent = err.message; st.classList.add("is-error"); }
+    finally { btn.disabled = false; }
   });
-  $("#signOut").addEventListener("click", () => {
+  $("#signOut").addEventListener("click", async () => {
+    const old = token;
     token = null; me = null;
     try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ }
+    // End the session on the server as well, so a token copied from this
+    // browser stops working. Signing out here still happens if that fails.
+    if (old) { try { await call({ action: "logout", token: old }); } catch (e) { /* signed out locally */ } }
     location.reload();
   });
 
@@ -76,12 +100,23 @@
       $("#adminEmail").textContent = me.email;
       renderTabs(); render();
     } catch (err) {
-      token = null; try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ }
-      $("#login").hidden = false;
-      if (!/Sign in required/.test(err.message)) { $("#emailStatus").textContent = err.message; $("#emailStatus").classList.add("is-error"); }
+      // Only a session the server has rejected is thrown away. A dropped
+      // connection keeps the token, so reloading picks up where you were
+      // instead of asking for a new code.
+      const ended = /Sign in required|Session expired|no longer an admin/.test(err.message);
+      if (ended) { token = null; try { localStorage.removeItem(TOKEN_KEY); } catch (e) { /* ignore */ } }
+      $("#app").hidden = true; $("#adminUser").hidden = true;
+      $("#login").hidden = false; $("#codeForm").hidden = true; $("#emailForm").hidden = false;
+      if (!/Sign in required/.test(err.message)) {
+        $("#emailStatus").textContent = ended ? err.message : err.message + " Reload the page to try again.";
+        $("#emailStatus").classList.add("is-error");
+      }
     }
   }
   async function refresh() { data = await api("adminData"); renderTabs(); render(); }
+  // Ids are text, and are compared as text wherever one is looked up.
+  const same = (a, b) => String(a) === String(b);
+  const DIGEST_MAX_AGE_DAYS = 7; // mirrors backend/Code.gs
   const isMaster = () => me && me.role === "master";
 
   /* ---------------- tabs ---------------- */
@@ -107,7 +142,16 @@
 
   /* ---------------- panel rendering ---------------- */
   const myGroups = () => data.groups || [];
-  function opts(list, sel) { return list.map((o) => { const [v, l] = Array.isArray(o) ? o : [o, o]; return `<option value="${esc(v)}"${String(sel) === String(v) ? " selected" : ""}>${esc(l)}</option>`; }).join(""); }
+  /* A dropdown must never change a stored value just because it has no option
+     for it: with nothing marked selected the browser submits the first option,
+     which is how adult groups were being saved as "Youth". A stored value that
+     is not on the list is offered, and selected, as itself. */
+  function opts(list, sel) {
+    const pairs = list.map((o) => (Array.isArray(o) ? o : [o, o]));
+    const given = sel !== undefined && sel !== null;          // "" is a real choice: "no group"
+    if (given && String(sel) !== "" && !pairs.some(([v]) => String(v) === String(sel))) pairs.push([sel, `${sel} (current value)`]);
+    return pairs.map(([v, l]) => `<option value="${esc(v)}"${given && String(sel) === String(v) ? " selected" : ""}>${esc(l)}</option>`).join("");
+  }
   function table(cols, rows, caption) {
     if (!rows.length) return `<p class="empty">Nothing here yet.</p>`;
     const cap = caption || (TABS.find((t) => t.id === tab) || {}).label || "Data";
@@ -173,12 +217,17 @@
         const g = myGroups().find((x) => x.id === r.groupId);
         return `<tr><td><b>${esc(r.date)}</b></td><td>${fmtTime(r.start)} – ${fmtTime(r.end)}</td><td>${esc(r.title)}<small>${esc(g ? g.name : sportName(r.sport))}</small></td><td>${esc(facName(r.facility))}</td><td>${esc(r.type)}</td>${actionBtns("editEvent", "delEvent", r.id, r.title)}</tr>`;
       });
-      P.innerHTML = `<p class="panel-note">One-off events: tournaments, open days, cleanups, closures. They appear under Today / This Week / Upcoming and in subscriber emails.</p>` + table(["Date", "Time", "Event", "Facility", "Type", ""], rows);
+      P.innerHTML = `<p class="panel-note">One-off events: tournaments, open days, cleanups, closures. Each one is announced to subscribers by email when it is added, changed, or comes within a week. <b>Dated events are not shown on the public page at the moment</b> — use a weekly block or post an update for anything visitors need to see there.</p>` + table(["Date", "Time", "Event", "Facility", "Type", ""], rows);
     },
     updates(P, A) {
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newUpdate">+ Post update</button>`;
-      const rows = (data.updates || []).map((u) => `<tr><td>${esc(String(u.createdAt).slice(0, 10))}</td><td><b>${esc(u.title)}</b><small>${esc(String(u.body).slice(0, 90))}${String(u.body).length > 90 ? "…" : ""}</small></td><td>${esc(u.sport === "all" ? "All sports" : sportName(u.sport))}</td><td>${esc(u.author)}</td><td>${u.sentAt ? '<span class="pill ok">Emailed</span>' : '<span class="pill warn">Queued</span>'}</td>${actionBtns("editUpdate", "delUpdate", u.id, u.title)}</tr>`);
-      P.innerHTML = `<p class="panel-note">Posts appear in Latest Updates on the public page and go out in the next daily digest to subscribers of that sport.</p>` + table(["Posted", "Update", "Sport", "Author", "Email", ""], rows);
+      // An unsent post is only still waiting while it is recent enough to send.
+      const fresh = (u) => Date.now() - Date.parse(u.createdAt) < DIGEST_MAX_AGE_DAYS * 86400000;
+      const mailPill = (u) => u.sentAt ? '<span class="pill ok">Emailed</span>' : fresh(u) ? '<span class="pill warn">Queued</span>' : '<span class="pill">Not emailed</span>';
+      const rows = (data.updates || []).map((u) => `<tr><td>${esc(String(u.createdAt).slice(0, 10))}</td><td><b>${esc(u.title)}</b><small>${esc(String(u.body).slice(0, 90))}${String(u.body).length > 90 ? "…" : ""}</small></td><td>${esc(u.sport === "all" ? "All sports" : sportName(u.sport))}</td><td>${esc(u.author)}</td><td>${mailPill(u)}</td>${actionBtns("editUpdate", "delUpdate", u.id, u.title)}</tr>`);
+      P.innerHTML = `<p class="panel-note">Posts appear in Latest Updates on the public page straight away. ${data.emailsPaused
+        ? `<b>Outgoing email is paused</b>, so nothing is being emailed. A queued post still goes out if email is turned on within ${DIGEST_MAX_AGE_DAYS} days of posting it.`
+        : `They go out in the next daily digest to subscribers of that sport; a post more than ${DIGEST_MAX_AGE_DAYS} days old is no longer emailed.`}</p>` + table(["Posted", "Update", "Sport", "Author", "Email", ""], rows);
     },
     worklog(P, A) {
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newWork">+ Log work</button>`;
@@ -192,7 +241,7 @@
     },
     projects(P, A) {
       A.innerHTML = `<button class="btn btn-primary btn-sm" data-act="newProject">+ Add project</button>`;
-      const rows = (data.projects || []).map((p) => `<tr><td><b>${esc(p.title)}</b><small>${esc(p.description).slice(0, 80)}</small></td><td>${esc(p.area || "—")}</td><td><span class="pill ${p.status === "COMPLETED" ? "ok" : "warn"}">${esc(p.status)}</span></td><td>${p.goal ? money(p.raised) + " / " + money(p.goal) : "—"}</td><td>${esc(p.lead || "")}</td>${actionBtns("editProject", "delProject", p.id, p.title)}</tr>`);
+      const rows = (data.projects || []).map((p) => `<tr><td><b>${esc(p.title)}</b><small>${esc(String(p.description || "").slice(0, 80))}</small></td><td>${esc(p.area || "—")}</td><td><span class="pill ${p.status === "COMPLETED" ? "ok" : "warn"}">${esc(p.status)}</span></td><td>${p.goal ? money(p.raised) + " / " + money(p.goal) : "—"}</td><td>${esc(p.lead || "")}</td>${actionBtns("editProject", "delProject", p.id, p.title)}</tr>`);
       P.innerHTML = `<p class="panel-note">Improvement projects shown on the public page, grouped by area (restrooms, facility updates, fields…).</p>` + table(["Project", "Area", "Status", "Raised / Goal", "Lead", ""], rows);
     },
     submissions(P) {
@@ -210,7 +259,9 @@
       P.innerHTML = `<div class="tiles"><div class="tile"><strong>${st.total || 0}</strong><span>Total</span></div><div class="tile"><strong>${st.confirmed || 0}</strong><span>Confirmed</span></div><div class="tile"><strong>${st.quotaLeft ?? "—"}</strong><span>Emails left today</span></div></div>
         <p class="panel-note">Digests go out automatically each morning to people whose chosen sports have news. Gmail allows about 100 emails a day on a free account.</p><div id="subList"></div>`;
       api("subscribers").then((r) => {
-        $("#subList").innerHTML = table(["Email", "Sports", "Status", "Joined"], r.subscribers.map((s) => `<tr><td>${esc(s.email)}</td><td>${esc((s.sports || []).join(", "))}</td><td>${s.confirmed ? '<span class="pill ok">Confirmed</span>' : '<span class="pill warn">Unconfirmed</span>'}</td><td>${esc(String(s.createdAt).slice(0, 10))}</td></tr>`));
+        // the list can arrive after you have moved to another tab
+        const box = $("#subList"); if (!box) return;
+        box.innerHTML = table(["Email", "Sports", "Status", "Joined"], r.subscribers.map((s) => `<tr><td>${esc(s.email)}</td><td>${esc((s.sports || []).join(", "))}</td><td>${s.confirmed ? '<span class="pill ok">Confirmed</span>' : '<span class="pill warn">Unconfirmed</span>'}</td><td>${esc(String(s.createdAt).slice(0, 10))}</td></tr>`));
       }).catch((e) => toast(e.message, true));
     }
   };
@@ -218,7 +269,9 @@
   /* ---------------- drawer forms ---------------- */
   const drawer = $("#drawer");
   const FOCUSABLE = 'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
-  let onSave = null, drawerLastFocus = null;
+  // drawerSeq changes every time the drawer opens or closes, so a save that
+  // finishes late can tell whether the drawer it belongs to is still the one open.
+  let onSave = null, drawerLastFocus = null, saving = false, drawerSeq = 0;
   function trapDrawer(e) {
     if (e.key !== "Tab") return;
     const f = $$(FOCUSABLE, $(".drawer-panel", drawer)).filter((el) => !el.disabled && el.offsetParent !== null);
@@ -239,13 +292,13 @@
     // as loose text ahead of the first field where a reader would skip it.
     $("#drawerHint").hidden = !dup;
     $("#drawerForm").innerHTML = fields;
-    $("#drawerStatus").textContent = "";
-    onSave = save; drawer.hidden = false;
+    $("#drawerStatus").textContent = ""; $("#drawerStatus").classList.remove("is-error");
+    onSave = save; drawerSeq++; drawer.hidden = false;
     document.addEventListener("keydown", trapDrawer);
     const first = $("#drawerForm input, #drawerForm select, #drawerForm textarea"); if (first) first.focus();
   }
   function closeDrawer() {
-    drawer.hidden = true; onSave = null;
+    drawer.hidden = true; onSave = null; drawerSeq++;
     $("#drawerHint").hidden = true; drawerIsDup = false;
     document.removeEventListener("keydown", trapDrawer);
     if (drawerLastFocus && drawerLastFocus.isConnected) drawerLastFocus.focus();
@@ -253,25 +306,55 @@
   drawer.addEventListener("click", (e) => { if (e.target.closest("[data-close]")) closeDrawer(); });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !drawer.hidden) closeDrawer(); });
   $("#drawerSave").addEventListener("click", async () => {
-    const f = $("#drawerForm"), st = $("#drawerStatus");
+    // One save at a time: a second click while the first is still on its way
+    // used to create the record twice.
+    if (saving || !onSave) return;
+    const f = $("#drawerForm"), st = $("#drawerStatus"), btn = $("#drawerSave");
     const v = {}; $$("[name]", f).forEach((el) => {
       if (el.type === "checkbox") { if (el.dataset.multi) { v[el.name] = v[el.name] || []; if (el.checked) v[el.name].push(el.value); } else v[el.name] = el.checked; }
       else v[el.name] = el.value;
     });
     if (v.start && v.end && v.start >= v.end) { st.textContent = "End time must be after the start time."; st.classList.add("is-error"); return; }
     st.classList.remove("is-error"); st.textContent = "Saving…";
-    try { await onSave(v); closeDrawer(); await refresh(); toast("Saved. The public page will show it shortly."); }
-    catch (err) { st.textContent = err.message; st.classList.add("is-error"); }
+    const seq = drawerSeq, save = onSave;
+    saving = true; btn.disabled = true; btn.setAttribute("aria-busy", "true");
+    let res;
+    try { res = await save(v); }
+    catch (err) {
+      // show the error in the drawer it belongs to; if that one was closed
+      // meanwhile, a toast is the only place left to say it
+      if (seq === drawerSeq) { st.textContent = err.message; st.classList.add("is-error"); } else toast(err.message, true);
+      saving = false; btn.disabled = false; btn.removeAttribute("aria-busy");
+      return;
+    }
+    saving = false; btn.disabled = false; btn.removeAttribute("aria-busy");
+    if (seq === drawerSeq) closeDrawer();
+    // The save has happened by now. If the list cannot be re-read, say exactly
+    // that — an error tucked into the closed drawer looked like a lost save.
+    try { await refresh(); toast(savedNote(res)); }
+    catch (err) { toast("Saved, but the list could not be reloaded. Refresh the page to see it.", true); }
   });
+  function savedNote(res) {
+    // an invitation that was asked for but could not be emailed is worth saying
+    if (res && res.invited && !res.emailed) return "Saved. The invitation was not emailed — outgoing email is paused or the send failed.";
+    return "Saved. The public page will show it shortly.";
+  }
   const field = (label, name, value, type = "text", help) => `<label class="span-2"><span>${label}${help ? ` <em class="field-help">${help}</em>` : ""}</span><input name="${name}" type="${type}" value="${esc(value ?? "")}"></label>`;
   const select = (label, name, list, sel, help) => `<label class="span-2"><span>${label}${help ? ` <em class="field-help">${help}</em>` : ""}</span><select name="${name}">${opts(list, sel)}</select></label>`;
   const area = (label, name, value, help) => `<label class="span-2"><span>${label}${help ? ` <em class="field-help">${help}</em>` : ""}</span><textarea name="${name}">${esc(value ?? "")}</textarea></label>`;
 
   const TYPES = D.activityTypes;
   const CATS = Object.keys(D.categories).map((k) => [k, D.categories[k].label]);
+  // "Auto" is first, so a new block is filed by its group's permit status
+  // unless the master deliberately chooses otherwise. It used to default to
+  // the first category in the list, which is "permitted".
+  const AUTO_CATS = [["", "Auto — follow the group's permit status"]].concat(CATS);
+  // today's date where the admin is, not in UTC (which is already tomorrow in
+  // the evening on the west coast)
+  const localToday = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
   /* ---------------- actions ---------------- */
-  const byId = (list, id) => (data[list] || []).find((x) => x.id === id) || {};
+  const byId = (list, id) => (data[list] || []).find((x) => same(x.id, id)) || {};
   /* Duplicating opens the editor on an existing record's values but saves it as
      a new one: a blank id makes the backend mint a fresh one. */
   const newId = (id, dup) => (dup ? "" : (id || ""));
@@ -294,7 +377,7 @@
         field("Start time", "start", r.start || "17:00", "time") + field("End time", "end", r.end || "19:00", "time") +
         select("Facility", "facility", D.facilities.map((f) => [f.id, f.name]), r.facility) +
         select("Activity type", "type", TYPES, r.type || "Practice") +
-        (isMaster() ? select("Category", "category", CATS, r.category) : "") +
+        (isMaster() ? select("Category", "category", AUTO_CATS, r.category || "") : "") +
         field("Title", "title", r.title, "text", "optional — defaults to the group name"),
         (v) => api("saveSchedule", { data: Object.assign({ id: newId(id, dup) }, v) }));
     },
@@ -310,7 +393,7 @@
         select("Group", "groupId", myGroups().map((g) => [g.id, g.name]).concat(isMaster() ? [["", "— facility-wide —"]] : []), r.groupId) +
         select("Facility", "facility", D.facilities.map((f) => [f.id, f.name]), r.facility) +
         select("Activity type", "type", TYPES, r.type || "Special Event") +
-        (isMaster() ? select("Category", "category", CATS, r.category) : "") +
+        (isMaster() ? select("Category", "category", AUTO_CATS, r.category || "") : "") +
         area("Note", "note", r.note, "one line shown on the card and in emails"),
         (v) => api("saveEvent", { data: Object.assign({ id: newId(id, dup) }, v) }));
     },
@@ -318,7 +401,7 @@
     /* updates */
     newUpdate: () => ACTIONS.editUpdate(null),
     editUpdate: (id, dup) => {
-      const u = id ? (data.updates || []).find((x) => x.id === id) || {} : {};
+      const u = id ? byId("updates", id) : {};
       openDrawer(drawerTitle(id, dup, "update", "Post an update"),
         field("Title", "title", u.title) + area("Message", "body", u.body) +
         (isMaster() ? select("Sport", "sport", [["all", "All sports"]].concat(D.sports.map((s) => [s.id, s.name])), u.sport || "all") : "") +
@@ -330,9 +413,9 @@
     /* work log */
     newWork: () => ACTIONS.editWork(null),
     editWork: (id, dup) => {
-      const w = id ? (data.worklog || []).find((x) => x.id === id) || {} : {};
+      const w = id ? byId("worklog", id) : {};
       openDrawer(drawerTitle(id, dup, "work entry", "Log work at the park"),
-        field("Date", "date", w.date || new Date().toISOString().slice(0, 10), "date") +
+        field("Date", "date", w.date || localToday(), "date") +
         area("What was done", "activity", w.activity) +
         select("Group", "groupId", (isMaster() ? [["", "— community volunteers —"]] : []).concat(myGroups().map((g) => [g.id, g.name])), w.groupId) +
         (isMaster() ? field("Organization name", "organization", w.organization, "text", "used when no group is selected") : "") +
@@ -345,16 +428,18 @@
     delWork: (id) => confirm("Delete this work entry?") && api("deleteWorkLog", { data: { id } }).then(refresh).then(() => toast("Deleted.")).catch((e) => toast(e.message, true)),
     /* email switch — sign-in codes are never paused, so this can't lock anyone out */
     toggleEmails: () => {
-      const on = !!data.emailsPaused; // paused now means we are turning it on
-      if (!on && !confirm("Turn outgoing email back on?\n\nWelcome emails, new-group alerts, subscriber confirmations and the daily 7am digest will start sending again.")) return;
-      api("setEmailsSending", { data: { on } }).then(refresh)
-        .then(() => toast(on ? "Email is on." : "Email paused — sign-in codes still send."))
+      const turnOn = !!data.emailsPaused; // paused now, so this click turns it on
+      // Turning email ON is the step that reaches other people, so that is the
+      // one that asks first. Pausing is always safe and happens at once.
+      if (turnOn && !confirm("Turn outgoing email ON?\n\nWelcome emails, new-group alerts and subscriber confirmations will start sending straight away, and the daily digest goes out at 7am. People who subscribed while email was paused are sent their confirmation link on the next morning's run.")) return;
+      api("setEmailsSending", { data: { on: turnOn } }).then(refresh)
+        .then(() => toast(turnOn ? "Email is on." : "Email paused — sign-in codes still send."))
         .catch((e) => toast(e.message, true));
     },
     /* groups */
     newGroup: () => ACTIONS.editGroup(null),
     editGroup: (id, dup) => {
-      const g = id ? myGroups().find((x) => x.id === id) || {} : {};
+      const g = id ? myGroups().find((x) => same(x.id, id)) || {} : {};
       const dayChecks = `<fieldset class="span-2"><legend>Typical days</legend><div class="check-row">${DAYS.map((d, i) => `<label><input type="checkbox" name="days" data-multi="1" value="${i}"${(g.days || []).indexOf(i) !== -1 ? " checked" : ""}> ${DAYS_S[i]}</label>`).join("")}</div></fieldset>`;
       // A new group's id comes from its name, so a duplicate saved under the
       // original name would land next to it as "<slug>-2" (the backend keeps
@@ -365,23 +450,31 @@
         field("Name", "name", gName) + field("Short code", "short", g.short, "text", "2–3 letters for the logo tile") +
         select("Sport", "sport", D.sports.map((s) => [s.id, s.name]), g.sport) +
         field("Program type", "programType", g.programType) +
-        select("Ages", "ages", ["Youth", "Mixed"], g.ages) + select("Level", "level", ["Recreational", "Competitive"], g.level) +
+        select("Ages", "ages", ["Youth", "Adult", "Mixed"], g.ages || "Mixed") + select("Level", "level", ["Recreational", "Competitive"], g.level || "Recreational") +
         field("Members in the group", "participants", g.participants, "number", "drives the $10-per-member monthly maintenance amount") +
         dayChecks + field("Typical times", "times", g.times, "text", 'e.g. "Tue · Thu 6:00 – 8:00 PM"') +
         field("Website", "website", g.website, "url") + field("Social link", "social", g.social, "url") + field("Social handle", "socialHandle", g.socialHandle) +
         field("Contact email", "email", g.email, "email") +
         area("Description", "description", g.description) + area("Description (Español)", "description_es", g.description_es, "optional") +
-        (isMaster() ? select("Permit status", "permitStatus", [["permitted", "Permitted"], ["none", "No permit on file"], ["unknown", "Permit status unknown"]], g.permitStatus) +
+        (isMaster() ? select("Permit status", "permitStatus", [["permitted", "Permitted"], ["none", "No permit on file"], ["unknown", "Permit status unknown"]], g.permitStatus || "unknown") +
           `<label class="span-2 check-row"><input type="checkbox" name="paidPermit"${g.paidPermit ? " checked" : ""}> Permit fee paid</label>` +
-          select("Directory section", "category", [["permitted", "Permitted organizations"], ["community", "Community & independent"]], g.category) +
-          field("Badges", "badges", (g.badges || []).join("|"), "text", "separate with |") : ""),
+          select("Directory section", "category", [["permitted", "Permitted organizations"], ["community", "Community & independent"]], g.category || "community") +
+          field("Badges", "badges", (g.badges || (id ? [] : ["COMMUNITY GROUP"])).join("|"), "text", "separate with |") : ""),
         (v) => { v.days = (v.days || []).map(Number); if (v.badges !== undefined) v.badges = String(v.badges).split("|").filter(Boolean); return api("saveGroup", { data: Object.assign({ id: newId(id, dup) }, v) }); });
     },
-    delGroup: (id) => confirm("Remove this group from the directory?") && api("deleteGroup", { data: { id } }).then(refresh).then(() => toast("Removed.")).catch((e) => toast(e.message, true)),
+    delGroup: (id) => {
+      // Say what goes with the group before it goes.
+      const g = myGroups().find((x) => same(x.id, id)) || {};
+      const blocks = (data.schedule || []).filter((r) => same(r.groupId, id)).length;
+      const events = (data.events || []).filter((r) => same(r.groupId, id)).length;
+      const also = blocks || events ? `\n\nThis also removes its ${blocks} weekly block${blocks === 1 ? "" : "s"} and ${events} dated event${events === 1 ? "" : "s"} from the schedule.` : "";
+      if (!confirm(`Remove ${g.name || "this group"} from the directory?${also}\n\nIts past updates and work-log entries are kept, and its admins lose access to it. This cannot be undone.`)) return;
+      api("deleteGroup", { data: { id } }).then(refresh).then(() => toast("Removed.")).catch((e) => toast(e.message, true));
+    },
     /* projects */
     newProject: () => ACTIONS.editProject(null),
     editProject: (id, dup) => {
-      const p = id ? (data.projects || []).find((x) => x.id === id) || {} : {};
+      const p = id ? byId("projects", id) : {};
       openDrawer(drawerTitle(id, dup, "project", "Add project"),
         field("Title", "title", p.title) + select("Area", "area", D.config.projectAreas, p.area) +
         select("Status", "status", ["PROPOSED", "PLANNING", "FUNDRAISING", "IN PROGRESS", "COMPLETED"], p.status || "PROPOSED") +
@@ -394,7 +487,7 @@
     delProject: (id) => confirm("Delete this project?") && api("deleteProject", { data: { id } }).then(refresh).then(() => toast("Deleted.")).catch((e) => toast(e.message, true)),
     /* submissions */
     approveSub: (id) => {
-      const s = (data.submissions || []).find((x) => x.id === id) || {};
+      const s = byId("submissions", id);
       openDrawer("Approve group listing",
         `<p class="span-2 panel-note">${esc(s.groupName)} — ${esc(s.contact)} (${esc(s.email)})<br>${esc(s.description || "")}</p>` +
         select("Sport", "sportId", D.sports.map((x) => [x.id, x.name]), (D.sports.find((x) => x.name.toLowerCase() === String(s.sport).toLowerCase()) || {}).id) +
@@ -406,15 +499,29 @@
     newAdmin: () => ACTIONS.editAdmin(null),
     editAdmin: (email) => {
       const a = email ? (data.admins || []).find((x) => x.email === email) || {} : {};
-      const checks = `<fieldset class="span-2"><legend>Groups this admin can manage</legend><div class="check-row">${(data.groups || []).map((g) => `<label><input type="checkbox" name="groupIds" data-multi="1" value="${g.id}"${(a.groupIds || []).indexOf(g.id) !== -1 ? " checked" : ""}> ${esc(g.name)}</label>`).join("")}</div></fieldset>`;
+      const checks = `<fieldset class="span-2"><legend>Groups this admin can manage</legend><div class="check-row">${(data.groups || []).map((g) => `<label><input type="checkbox" name="groupIds" data-multi="1" value="${esc(g.id)}"${(a.groupIds || []).some((x) => same(x, g.id)) ? " checked" : ""}> ${esc(g.name)}</label>`).join("")}</div></fieldset>`;
       openDrawer(email ? "Edit admin" : "Add community admin",
         field("Email", "email", a.email, "email") + field("Name", "name", a.name) + checks +
-        `<label class="span-2 check-row"><input type="checkbox" name="notify" checked> Email them an invitation</label>`,
+        // ticked for a new admin; left off when editing one, so changing their
+        // groups does not send the invitation again
+        `<label class="span-2 check-row"><input type="checkbox" name="notify"${email ? "" : " checked"}> Email them an invitation</label>`,
         (v) => api("addAdmin", { data: { email: v.email, name: v.name, role: "community", groupIds: v.groupIds || [], notify: !!v.notify } }));
     },
     delAdmin: (email) => confirm(`Remove ${email} as an admin?`) && api("removeAdmin", { data: { email } }).then(refresh).then(() => toast("Removed.")).catch((e) => toast(e.message, true)),
     /* subscribers */
-    sendDigest: () => confirm("Send the digest now to everyone with matching news?") && api("sendDigestNow").then((r) => { toast(`Sent ${r.sent}, skipped ${r.skipped}.`); return refresh(); }).catch((e) => toast(e.message, true))
+    sendDigest: () => confirm("Send the digest now to everyone with news they have not been sent yet?") && api("sendDigestNow").then((r) => {
+      // "Sent 0, skipped 0" read as "nobody had news" when the real reason was the pause
+      if (r.paused) toast("Outgoing email is paused, so nothing was sent.", true);
+      else if (r.busy) toast("A digest run is already under way. Nothing was sent twice.", true);
+      else {
+        const bits = [`Sent ${r.sent}`, `${r.skipped} had nothing new`];
+        if (r.confirmations) bits.push(`${r.confirmations} confirmation link${r.confirmations === 1 ? "" : "s"} sent`);
+        if (r.failed) bits.push(`${r.failed} could not be sent`);
+        if (r.stoppedForQuota) bits.push("stopped at today's email limit — the rest go out tomorrow");
+        toast(bits.join(" · ") + ".", !!(r.failed || r.stoppedForQuota));
+      }
+      return refresh();
+    }).catch((e) => toast(e.message, true))
   };
 
   /* ---------------- go ---------------- */
