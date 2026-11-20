@@ -195,8 +195,36 @@
     "No work logged yet.": "Aún no se ha registrado trabajo.",
     "Ground plan & dimensions": "Plano y dimensiones",
     "Enhanced aerial concept with measured spans. Google Maps estimates, not a survey.": "Concepto aéreo mejorado con distancias medidas. Estimaciones de Google Maps, no un levantamiento.",
-    "Quick guide for park visitors when cricket is in progress.": "Guía rápida para visitantes del parque cuando hay críquet."
+    "Quick guide for park visitors when cricket is in progress.": "Guía rápida para visitantes del parque cuando hay críquet.",
+    // contribution card and join form
+    "toward the upkeep the City does not cover, plus": "para el mantenimiento que la Ciudad no cubre, más",
+    "Set up a monthly contribution": "Configurar una contribución mensual", "One-time toward a project": "Una sola vez para un proyecto", "Make a one-time contribution": "Hacer una contribución única",
+    "Memo on your contribution:": "Nota en tu contribución:", "Put this toward": "Destinar a", "Contributing for": "Contribuyo por",
+    "General maintenance — where it is needed most": "Mantenimiento general — donde más se necesite", "Myself — not for a group": "Yo — no es para un grupo",
+    "Group name *": "Nombre del grupo *", "People in group *": "Personas en el grupo *", "I'd like to help with *": "Quiero ayudar con *",
+    "Shown on your public listing so people can reach your group.": "Se muestra en tu ficha pública para que la gente pueda contactar a tu grupo.", "Note": "Nota",
+    // what the forms say back
+    "You're on the community list. Thank you for joining.": "Ya estás en la lista de la comunidad. Gracias por unirte.",
+    "You're signed up.": "Ya estás inscrito.",
+    "You're signed up. We'll email your confirmation link as soon as email updates are running.": "Ya estás inscrito. Te enviaremos el enlace de confirmación por correo en cuanto las actualizaciones por correo estén activas.",
+    "Your sports preferences were updated.": "Tus preferencias de deportes se actualizaron.",
+    "Opening your email app with the details pre-filled. Send it to complete your sign-up.": "Abriendo tu aplicación de correo con los datos ya escritos. Envíalo para completar tu registro.",
+    "We couldn't reach the hub just now. Please check your connection and try again.": "No pudimos conectar con el centro en este momento. Revisa tu conexión e inténtalo de nuevo.",
+    "Too many requests. Please try again later.": "Demasiadas solicitudes. Inténtalo de nuevo más tarde.",
+    "Please enter a valid email address.": "Escribe un correo electrónico válido.", "Please enter a valid phone number so we can reach you.": "Escribe un número de teléfono válido para poder contactarte.", "Please enter your name.": "Escribe tu nombre.",
+    "Valid email required": "Se necesita un correo electrónico válido", "Group name and a valid email are required": "Se necesitan el nombre del grupo y un correo electrónico válido",
+    "Something went wrong setting that up. Please try again in a moment.": "Algo salió mal al prepararlo. Inténtalo de nuevo en un momento.",
+    "Stripe could not start that contribution. Please try again.": "Stripe no pudo iniciar esa contribución. Inténtalo de nuevo.",
+    "The smallest contribution is $5.": "La contribución mínima es de $5.", "For more than $5000, please get in touch so we can thank you properly.": "Para más de $5000, ponte en contacto con nosotros para poder agradecerte como corresponde.",
+    "Choose a group for a monthly contribution.": "Elige un grupo para una contribución mensual.", "That group has no headcount on file yet. An admin can add one.": "Ese grupo aún no tiene registrado su número de miembros. Un administrador puede agregarlo.",
+    "Contributions are not switched on yet.": "Las contribuciones aún no están activadas.", "Monthly contributions are not switched on yet.": "Las contribuciones mensuales aún no están activadas."
   };
+  /* Copy typed in the page uses ' and typeset copy uses ’. They are the same
+     key here, so a translation never goes missing over an apostrophe — three
+     of the join form's lines were staying in English for exactly that reason. */
+  const plain = (s) => s.replace(/[\u2018\u2019]/g, "'");
+  Object.keys(ES).forEach((k) => { const p = plain(k); if (p !== k && !(p in ES)) ES[p] = ES[k]; });
+  const lookup = (s) => ES[s] || ES[plain(s)];
 
   // Patterns for strings that contain numbers or variable parts
   const RULES = [
@@ -215,7 +243,8 @@
   const ATTRS = ["placeholder", "title", "aria-label"];
   function translateString(s) {
     const t = s.trim(); if (!t) return null;
-    if (ES[t]) return s.replace(t, ES[t]);
+    const hit = lookup(t);
+    if (hit) return s.replace(t, () => hit);
     for (const [re, fn] of RULES) { const m = t.match(re); if (m) return s.replace(t, fn(m)); }
     return null;
   }
@@ -277,7 +306,7 @@
   window.I18N = {
     get lang() { return lang; },
     set, apply,
-    t: (s) => (lang === "es" ? (ES[s] || s) : s),
+    t: (s) => (lang === "es" ? (lookup(s) || s) : s),
     get locale() { return lang === "es" ? "es-US" : "en-US"; },
     get days() { return lang === "es" ? ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"] : ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]; },
     get daysShort() { return lang === "es" ? ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"] : ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]; },
