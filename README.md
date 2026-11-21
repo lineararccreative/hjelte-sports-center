@@ -21,9 +21,7 @@ js/data.js        CONTENT + CONFIG — edit this to update the site
 js/app.js         public behavior: schedule engine, directory, map, forms
 js/admin.js       admin center behavior
 js/i18n.js        English/Spanish dictionary and toggle
-backend/Code.gs   Google Apps Script backend (Sheets-backed API)
-backend/Seed.gs   one-time sample-data seeding
-backend/SETUP.md  15-minute backend setup guide
+(backend)         Google Apps Script API - source kept in a separate private repository
 assets/img/       photos and plans
 .nojekyll         tells GitHub Pages to serve files as-is
 ```
@@ -34,7 +32,7 @@ Sticky nav · hero with aerial and stats · about · nine sport cards · Today/T
 
 ## Admin center
 
-`admin.html`. Sign in with an emailed 6-digit code — no passwords. One **master admin** (teamla@losangelescricket.org) manages everything; **community admins** manage only the groups assigned to them: their group profile, their schedule blocks and events, their updates and their work-log entries. Set it up with `backend/SETUP.md`; until then the page says the backend isn't connected and the public site runs on the sample data in `js/data.js`.
+`admin.html`. Sign in with an emailed 6-digit code — no passwords. One **master admin** (teamla@losangelescricket.org) manages everything; **community admins** manage only the groups assigned to them: their group profile, their schedule blocks and events, their updates and their work-log entries. The backend source and setup guide live in a separate private repository. Without a backend connected, the page says the backend isn't connected and the public site runs on the sample data in `js/data.js`.
 
 ## Spanish
 
