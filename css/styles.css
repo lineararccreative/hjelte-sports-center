@@ -42,6 +42,11 @@
 /* ---------- Reset ---------- */
 *, *::before, *::after { box-sizing: border-box; }
 html { scroll-behavior: smooth; scroll-padding-top: calc(var(--header-h) + 12px); -webkit-text-size-adjust: 100%; }
+/* The hidden attribute always wins. A component that sets its own display
+   (flex, grid) silently overrides the browser's rule for [hidden], which is
+   how an amount with no label showed as an empty radio button, and how the
+   admin sign-in showed the code box and Sign out before anyone had signed in. */
+[hidden] { display: none !important; }
 body {
   margin: 0; font-family: var(--body); color: var(--ink); background: var(--paper);
   line-height: 1.55; font-size: 16px; -webkit-font-smoothing: antialiased;
@@ -495,6 +500,8 @@ h3 { font-size: clamp(1.4rem, 2.6vw, 1.9rem); font-weight: 600; }
 .progress-text { display: flex; justify-content: space-between; font-size: .8rem; color: var(--muted); }
 .progress-text b { color: var(--ink); }
 .project-card .btn { margin-top: auto; align-self: flex-start; }
+.project-actions { margin-top: auto; display: flex; flex-wrap: wrap; gap: 8px; }
+.project-actions .btn { margin-top: 0; }
 
 /* ---------- Contribute ---------- */
 .contribute-grid { display: grid; gap: 16px; }
@@ -1051,6 +1058,15 @@ a, button, summary, [role="button"], label, select, input, textarea { -webkit-ta
 .amt-other input { width: 92px; padding: 7px 9px; border: 1px solid var(--line); border-radius: 9px;
   font: inherit; font-size: .92rem; background: #fff; }
 .amt-other input:disabled { background: var(--off); color: var(--muted); }
+/* A sponsor pays through the same box: one tick, then the name to put on it. */
+.sponsor-row { display: grid; gap: 10px; margin: 0 0 16px; }
+.sponsor-check { display: flex; align-items: flex-start; gap: 8px; font-size: .92rem; color: var(--ink-3); line-height: 1.45; cursor: pointer; }
+.sponsor-check input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--grass-dark); }
+.sponsor-name { display: grid; gap: 6px; }
+.sponsor-name > span { font-size: .78rem; font-weight: 600; color: var(--ink-3); }
+.sponsor-name input { width: 100%; max-width: 360px; min-height: 44px; padding: 10px 12px; font: inherit; font-size: .92rem;
+  border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+.sponsor-name input:focus-visible, .sponsor-check input:focus-visible { outline: 3px solid var(--gold-dark); outline-offset: 2px; }
 .pay-card .btn[disabled], .pay-card .btn[aria-disabled="true"] { opacity: .55; cursor: not-allowed; }
 .pay-status { grid-column: 1 / -1; margin: 0; font-size: .88rem; color: var(--muted); min-height: 1.2em; }
 .pay-status.is-bad { color: #8A3B2E; font-weight: 600; }
