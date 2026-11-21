@@ -637,6 +637,24 @@
     if (a.dataset.msg) $("#contactForm textarea").value = a.dataset.msg;
   });
 
+  // links that open the payment step with the choice already made: a project's
+  // "Fund This Project" button, and the Sponsor card
+  document.addEventListener("click", (e) => {
+    const a = e.target.closest("[data-pay-project], [data-pay-sponsor]"); if (!a) return;
+    const ps = $("#payProject"), sp = $("#paySponsor");
+    if (a.hasAttribute("data-pay-project") && ps) {
+      const id = a.getAttribute("data-pay-project");
+      ps.value = ps.querySelector(`option[value="${cssEsc(id)}"]`) ? id : "";
+    }
+    const sponsor = a.hasAttribute("data-pay-sponsor");
+    if (sponsor && sp) sp.checked = true;
+    syncSponsor();
+    // The link itself scrolls to the payment step. Focus follows without a
+    // second scroll, so a keyboard or screen-reader user lands there too.
+    const target = sponsor ? $("#paySponsorName") : ps;
+    if (target) setTimeout(() => target.focus({ preventScroll: true }), 0);
+  });
+
   /* ---------------- facility map ---------------- */
   const svgNS = "http://www.w3.org/2000/svg";
   const W = 1000, H = 700;
@@ -815,6 +833,10 @@
   function renderProjects() {
     const list = D.projects.filter((p) => (!projStatus || p.status === projStatus) && (!projArea || p.area === projArea));
     $("#projectGrid").innerHTML = list.map((p) => {
+      // A project the payment step can take money for gets a button that opens
+      // it with this project already chosen. Offers of time or materials still
+      // go to the contact form.
+      const payable = payProjects().some((x) => x.id === p.id);
       return `<article class="project-card">
         <div class="status-row"><span class="status s-${slug(p.status)}">${esc(p.status)}</span>${p.area ? `<span class="tag">${esc(p.area)}</span>` : ""}</div>
         <h3>${esc(p.title)}</h3>
@@ -826,7 +848,10 @@
           <div><b>Volunteer:</b> ${esc(p.volunteer)}</div>
         </div>
         ${p.status === "COMPLETED" ? "" : `<p class="fund-line"><b>Funding needed:</b> TBD</p>`}
-        ${p.status === "COMPLETED" ? `<a href="#featured" class="btn btn-outline btn-sm">See the story</a>` : `<a href="#connect" class="btn btn-primary btn-sm" data-topic="Fund a project" data-msg="${esc(`I'd like to support the project: ${p.title}.\n\nHow I can help (funds, materials, volunteer time, introductions):\n`)}">Support This Project</a>`}
+        ${p.status === "COMPLETED" ? `<a href="#featured" class="btn btn-outline btn-sm">See the story</a>` : `<div class="project-actions">
+          ${payable ? `<a href="#contributeStep" class="btn btn-primary btn-sm" data-pay-project="${esc(p.id)}">Fund This Project</a>` : ""}
+          <a href="#connect" class="btn ${payable ? "btn-outline" : "btn-primary"} btn-sm" data-topic="Fund a project" data-msg="${esc(`I'd like to support the project: ${p.title}.\n\nHow I can help (funds, materials, volunteer time, introductions):\n`)}">${payable ? "Offer Time or Materials" : "Support This Project"}</a>
+        </div>`}
       </article>`;
     }).join("") || `<p class="empty-note" style="grid-column:1/-1">No projects with this status yet.</p>`;
   }
@@ -901,10 +926,15 @@
 
   /* ---------------- contribute ---------------- */
   function renderContribute() {
-    const topicFor = { volunteer: "Volunteering", sponsor: "Sponsorship", equipment: "Equipment donation", collaborate: "Partnership proposal" };
-    $("#contributeGrid").innerHTML = D.contribute.map((c) => `<article class="contribute-card">
+    const topicFor = { volunteer: "Volunteering", equipment: "Equipment donation", collaborate: "Partnership proposal" };
+    // A sponsor pays through the same one-time box as everyone else, so that
+    // card opens the payment step with the sponsorship box already ticked.
+    $("#contributeGrid").innerHTML = D.contribute.map((c) => {
+      const pay = c.id === "sponsor";
+      return `<article class="contribute-card">
       <span class="ic">${icon(c.icon)}</span><h3>${esc(c.title)}</h3><p>${esc(c.text)}</p>
-      <a href="${c.href || "#connect"}" class="btn ${c.href ? "btn-outline" : "btn-dark"} btn-sm" ${topicFor[c.id] ? `data-topic="${topicFor[c.id]}"` : ""}>${esc(c.cta)}</a></article>`).join("");
+      <a href="${pay ? "#contributeStep" : (c.href || "#connect")}" class="btn ${c.href ? "btn-outline" : "btn-dark"} btn-sm" ${pay ? `data-pay-sponsor="1"` : topicFor[c.id] ? `data-topic="${topicFor[c.id]}"` : ""}>${esc(c.cta)}</a></article>`;
+    }).join("");
   }
 
   /* ---------------- connect ---------------- */
@@ -951,6 +981,7 @@
     const perHead = Number(M.monthlyPerPerson || 0) * (1 + Number(M.adminPct || 0) / 100);
     const keepAmt = ($$('#payGrid [name="payAmt"]').find((r) => r.checked) || {}).value;
     const keepOther = ($("#payAmtOther") || {}).value;
+    const keepSponsor = !!($("#paySponsor") || {}).checked, keepSponsorName = ($("#paySponsorName") || {}).value || "";
     $("#payGrid").innerHTML = `
       <article class="pay-card">
         <span class="ic">${icon("hands")}</span>
@@ -970,12 +1001,20 @@
           <label><input type="radio" name="payAmt" value="other"> ${esc(I18.t("Other"))}</label>
           <span class="amt-other"><span aria-hidden="true">$</span><input type="number" id="payAmtOther" min="${PAY_MIN}" max="${PAY_MAX}" step="1" inputmode="decimal" aria-label="${esc(I18.t("Other amount, in dollars"))}" disabled></span>
         </fieldset>
+        <div class="sponsor-row">
+          <label class="sponsor-check"><input type="checkbox" id="paySponsor"> <span>${esc(I18.t("This is a sponsorship from a business or organization"))}</span></label>
+          <label class="sponsor-name" id="paySponsorWrap" hidden><span>${esc(I18.t("Business or organization name"))}</span>
+            <input type="text" id="paySponsorName" maxlength="80" autocomplete="organization"></label>
+        </div>
         <button class="btn btn-primary btn-sm" type="button" data-checkout="payment">${esc(I18.t("Make a one-time contribution"))}</button>
       </article>
       <p class="pay-status" id="payStatus" role="status" aria-live="polite"></p>
       ${safeUrl(M.manageUrl) ? `<p class="pay-manage">${esc(I18.t("Already contributing monthly?"))} <a href="${esc(safeUrl(M.manageUrl))}" target="_blank" rel="noopener">${esc(I18.t("Manage or cancel your contribution"))}<span class="sr-only"> ${esc(I18.t("(opens Stripe in a new tab)"))}</span></a></p>` : ""}`;
     bindPayGrid();
+    // put a sponsor's tick and name back before the memo is rebuilt
+    if (keepSponsor) { $("#paySponsor").checked = true; $("#paySponsorName").value = keepSponsorName; }
     renderPayPicker();
+    syncSponsor();
     // This whole grid is rebuilt again after an unrelated join-form submit and
     // after the live-data refresh. Silently resetting a chosen $100 back to the
     // $50 default would change what someone is about to pay, so put it back.
@@ -1023,7 +1062,14 @@
       const s = $("#payStatus"); if (s) { s.textContent = ""; s.classList.remove("is-bad"); }
       renderMembership();
     });
+    grid.addEventListener("input", (e) => { if (e.target.id === "paySponsorName") updatePayMemo(); });
     grid.addEventListener("change", (e) => {
+      if (e.target.id === "paySponsor") {
+        syncSponsor();
+        // only a real tick moves focus; restoring the box after a re-render does not
+        if (e.target.checked && e.isTrusted) $("#paySponsorName").focus();
+        return;
+      }
       if (e.target.name !== "payAmt") return;
       const other = $("#payAmtOther");
       const isOther = e.target.value === "other";
@@ -1049,7 +1095,8 @@
         const gs = $("#payGroup"); if (gs) gs.focus();
         return;
       }
-      const data = { mode, ref: payRef, projectId: $("#payProject").value || "", groupId: $("#payGroup").value || "" };
+      // A sponsorship is a one-time payment, so the monthly plan never carries its mark.
+      const data = { mode, ref: mode === "payment" ? payRef : payRef.replace(/--sponsor$/, ""), projectId: $("#payProject").value || "", groupId: $("#payGroup").value || "" };
       if (mode === "payment") {
         const picked = $$('#payGrid [name="payAmt"]').find((r) => r.checked);
         const dollars = !picked ? NaN
@@ -1062,6 +1109,16 @@
           return;
         }
         data.amountCents = Math.round(dollars * 100);
+        const sp = $("#paySponsor");
+        if (sp && sp.checked) {
+          const who = ($("#paySponsorName").value || "").trim();
+          if (who.length < 2) {
+            say(I18.t("Enter the business or organization name."), true);
+            $("#paySponsorName").focus();
+            return;
+          }
+          data.sponsor = true; data.sponsorName = who.slice(0, 80);
+        }
       }
       payBusy = true; btn.disabled = true;
       const was = btn.textContent; btn.textContent = I18.t("Opening Stripe…");
@@ -1116,9 +1173,12 @@
     // Titles are free text an admin edits, so a stable id is appended where one
     // exists; two similarly named rows stay distinguishable in Stripe's exports.
     const part = (label, rec) => refToken(label) + (rec && rec.id ? "-" + refToken(rec.id).slice(0, 24) : "");
-    payRef = `${part(projLabel, proj)}--for--${part(grpLabel, grp)}`.slice(0, 200);
+    const sponsorOn = !!($("#paySponsor") || {}).checked;
+    const sponsorName = sponsorOn ? (($("#paySponsorName") || {}).value || "").trim() : "";
+    // "--sponsor" is nine characters; the whole reference may be 200
+    payRef = `${part(projLabel, proj)}--for--${part(grpLabel, grp)}`.slice(0, sponsorOn ? 191 : 200) + (sponsorOn ? "--sponsor" : "");
     const note = $("#payMemo");
-    if (note) note.textContent = `${I18.t("Memo on your contribution:")} ${proj ? projLabel : I18.t(GENERAL_PROJECT)} · ${grp ? grpLabel : I18.t(NO_GROUP)}`;
+    if (note) note.textContent = `${I18.t("Memo on your contribution:")} ${proj ? projLabel : I18.t(GENERAL_PROJECT)} · ${grp ? grpLabel : I18.t(NO_GROUP)}${sponsorOn ? ` · ${I18.t("Sponsorship")}${sponsorName ? ": " + sponsorName : ""}` : ""}`;
 
     // The monthly amount is the group's headcount, so it is spelled out here
     // rather than first appearing on Stripe's page.
@@ -1166,6 +1226,16 @@
       }
       opt.hidden = !offer;
     }
+  }
+
+  /* A sponsor uses the same one-time box. Ticking it asks for the name to put
+     on the payment and marks the payment as a sponsorship in Stripe. */
+  function syncSponsor() {
+    const box = $("#paySponsor"), wrap = $("#paySponsorWrap"); if (!box || !wrap) return;
+    wrap.hidden = !box.checked;
+    const btn = $('#payGrid [data-checkout="payment"]');
+    if (btn && !payBusy) btn.textContent = I18.t(box.checked ? "Make a sponsorship contribution" : "Make a one-time contribution");
+    updatePayMemo();
   }
 
   function syncMemberType(clearSize) {
