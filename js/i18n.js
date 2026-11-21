@@ -199,6 +199,9 @@
     // contribution card and join form
     "toward the upkeep the City does not cover, plus": "para el mantenimiento que la Ciudad no cubre, más",
     "Set up a monthly contribution": "Configurar una contribución mensual", "One-time toward a project": "Una sola vez para un proyecto", "Make a one-time contribution": "Hacer una contribución única",
+    "Fund This Project": "Financiar este proyecto", "Offer Time or Materials": "Ofrecer tiempo o materiales",
+    "This is a sponsorship from a business or organization": "Es un patrocinio de una empresa u organización", "Business or organization name": "Nombre de la empresa u organización",
+    "Enter the business or organization name.": "Escribe el nombre de la empresa u organización.", "Make a sponsorship contribution": "Hacer una contribución de patrocinio",
     "Memo on your contribution:": "Nota en tu contribución:", "Put this toward": "Destinar a", "Contributing for": "Contribuyo por",
     "General maintenance — where it is needed most": "Mantenimiento general — donde más se necesite", "Myself — not for a group": "Yo — no es para un grupo",
     "Group name *": "Nombre del grupo *", "People in group *": "Personas en el grupo *", "I'd like to help with *": "Quiero ayudar con *",
